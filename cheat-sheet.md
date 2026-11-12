@@ -189,6 +189,58 @@ Prefer `pull_request` when testing PR code. Do not execute untrusted PR code in 
 
 To retain failure evidence, an upload step can use `if: always()`; this allows the step to run after earlier failures but does not create missing evidence. Sanitize files before uploading and set a suitable retention period.
 
+### Durable run summary plus retained decision log
+
+For validation on pull requests targeting `main`, write a concise Markdown summary to `$GITHUB_STEP_SUMMARY` and upload the detailed decision log as a workflow artifact:
+
+```yaml
+name: agent-validation
+on:
+  pull_request:
+    branches: [main]
+
+permissions:
+  contents: read
+
+jobs:
+  validate:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+
+      - name: Run validation and capture decision log
+        shell: bash
+        run: |
+          set -o pipefail
+          ./scripts/validate-agents.sh 2>&1 | tee decision-log.md
+
+      - name: Write workflow summary
+        if: ${{ always() }}
+        env:
+          OUTCOME: ${{ job.status }}
+        run: |
+          {
+            echo "## Agent validation"
+            echo ""
+            echo "Outcome: **$OUTCOME**"
+            echo ""
+            echo "See the workflow artifacts for the detailed decision log."
+          } >> "$GITHUB_STEP_SUMMARY"
+
+      - name: Upload decision log
+        if: ${{ always() }}
+        uses: actions/upload-artifact@v4
+        with:
+          name: agent-validation-decision-log
+          path: decision-log.md
+          retention-days: 30
+          if-no-files-found: error
+```
+
+Replace the sample command with the platform team's validator. `tee` saves its output while preserving a failing exit code via `pipefail`; `always()` lets the summary and artifact steps run after validation failure. `$GITHUB_STEP_SUMMARY` appears on the workflow run page, while the artifact retains the detailed log for the configured period.
+
 ### Workflow completion and failure escalation
 
 For “run after validation completes; create an issue only if validation fails”:
