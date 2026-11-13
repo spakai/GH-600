@@ -66,8 +66,34 @@ More context is not automatically better. Supply the smallest relevant, trustwor
 - **MCP (Model Context Protocol)** is an open standard for connecting AI applications with external context and capabilities.
 - A **host** is the AI application; an **MCP client** manages a connection; an **MCP server** exposes capabilities.
 - Know the capability categories: **tools** (actions), **resources** (context/data), and **prompts** (reusable prompt templates).
+- **MCP server vs. tool:** the server is the provider/connection; its tools are individual callable operations. One server can expose multiple tools (and resources or prompts); configuring the server does not itself grant the agent permission to call every tool.
 - MCP extends the agent's available tools/data; it does not replace task instructions or grant safe judgment.
 - Before enabling a server, verify its source, requested permissions, configuration, and data handling. Use least privilege and avoid exposing secrets.
+- In custom-agent frontmatter, the agent-level `tools` list is the allowlist. An empty `tools: []` prevents tool use; a server-level `tools: ["*"]` does not override that list. Add only the required MCP tool names to the agent's list to grant narrowly scoped access.
+- **Example:** a `release-notes` server offers `lookup_release` and `publish_release`. An issue-triage agent that only needs release metadata should allow `release-notes/lookup_release`, not `release-notes/publish_release`:
+
+  ```yaml
+  ---
+  name: release-issue-router
+  description: Triage release issues and prepare metadata notes
+  target: github-copilot
+  tools:
+    - read
+    - search
+    - release-notes/lookup_release
+  mcp-servers:
+    release-notes:
+      type: local
+      command: npx
+      args: ["@example/release-notes-mcp"]
+      tools: ["*"]
+      env:
+        RELEASE_NOTES_TOKEN: ${{ secrets.COPILOT_MCP_RELEASE_NOTES_TOKEN }}
+  ---
+  Triage issues, inspect related source, and use release metadata only when needed.
+  ```
+
+  The namespaced tool name is illustrative; use the actual name exposed by the server. Agent-profile `mcp-servers` configuration is for GitHub Copilot cloud agents, not custom agents running directly in IDEs.
 
 ## 5. Safe and reliable agent use
 
@@ -95,6 +121,8 @@ For a delegated code change, the dependable workflow is:
 7. Approve and merge only after normal repository review requirements are met.
 
 **A PR is a review boundary, not a guarantee.** Confirm the agent changed the intended branch/files and that checks correspond to the final commit.
+
+**Draft PR:** explicitly marked as work in progress. GitHub shows a **Draft** label and a **Ready for review** button; it cannot be merged until marked ready. Regular PRs are ready for review when opened, but still need to satisfy required checks, approvals, and branch rules. Draft status is a readiness signal, not a safety guarantee.
 
 ## 7. Evaluation checklist
 
