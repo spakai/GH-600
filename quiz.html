@@ -1,0 +1,640 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>GH-600 Practice Quiz</title>
+  <style>
+    :root { color-scheme: light dark; font-family: system-ui, sans-serif; line-height: 1.5; }
+    body { margin: 0; background: light-dark(#f4f6fa, #111827); color: light-dark(#172033, #f3f4f6); }
+    main { max-width: 760px; margin: auto; padding: 2rem 1rem 4rem; }
+    h1 { margin-bottom: .25rem; }
+    .intro, .meta { color: light-dark(#4b5563, #c0c9d8); }
+    .panel { background: light-dark(#fff, #1f2937); border: 1px solid light-dark(#d5dce7, #475569); border-radius: .75rem; padding: 1.25rem; margin-top: 1.5rem; }
+    progress { width: 100%; height: .75rem; accent-color: #2563eb; }
+    h2 { font-size: 1.2rem; }
+    .options { display: grid; gap: .6rem; }
+    button { font: inherit; cursor: pointer; border: 1px solid light-dark(#adb9ca, #77859a); border-radius: .5rem; padding: .7rem 1rem; background: light-dark(#fff, #293548); color: inherit; text-align: left; }
+    button:hover:not(:disabled) { border-color: #3b82f6; }
+    button:focus-visible { outline: 3px solid #60a5fa; outline-offset: 2px; }
+    button:disabled { cursor: default; opacity: .7; }
+    .option.correct { border-color: #16a34a; background: light-dark(#eaf8ed, #153d29); opacity: 1; }
+    .option.incorrect { border-color: #dc2626; background: light-dark(#fef0f0, #502323); opacity: 1; }
+    .feedback { border-top: 1px solid light-dark(#d5dce7, #475569); margin-top: 1.25rem; padding-top: .5rem; }
+    .feedback li { margin: .6rem 0; }
+    .controls { display: flex; flex-wrap: wrap; gap: .6rem; justify-content: space-between; margin-top: 1.25rem; }
+    .primary { background: #2563eb; border-color: #2563eb; color: white; }
+    .primary:hover:not(:disabled) { background: #1d4ed8; }
+    a { color: light-dark(#1d4ed8, #93c5fd); }
+  </style>
+</head>
+<body>
+<main>
+  <h1>GH-600 Practice Quiz</h1>
+  <p class="intro">45 original practice questions. Choose an answer to see why every option is correct or incorrect. Answers are kept only while this page is open.</p>
+  <p class="intro">Unofficial study material; check the <a href="https://learn.microsoft.com/en-us/credentials/certifications/resources/study-guides/gh-600">official study guide</a> for current objectives.</p>
+  <div class="meta" id="status"></div>
+  <progress id="progress" max="45" value="0" aria-label="Questions answered"></progress>
+  <section class="panel" id="quiz" aria-labelledby="question-title"></section>
+</main>
+<script>
+const questions = [
+  {
+    topic: "Agent architecture",
+    question: "A team needs to delegate a multi-step repository change while retaining review before merge. Which approach best fits?",
+    options: [
+      ["Assign a scoped issue to a coding agent and review its pull request.", "Delegation can produce a reviewable change without removing human oversight."],
+      ["Ask chat for a single explanation and merge without checking.", "An explanation is not a verified repository change, and skipping review removes oversight."],
+      ["Give an agent production administrator credentials.", "Broad production access is unnecessary for a repository change."],
+      ["Treat a generated pull request as proof that tests passed.", "A pull request is a review artifact, not proof of successful validation."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Agent architecture",
+    question: "Which element actually performs an external action in an agent workflow?",
+    options: [
+      ["The task title", "A title describes work; it does not execute an action."],
+      ["An authorized tool invoked by the runtime", "Tools can perform actions, subject to runtime permissions and controls."],
+      ["A model response by itself", "A response may propose an action, but external changes require an execution mechanism."],
+      ["An acceptance criterion", "Acceptance criteria define the desired outcome, not the action mechanism."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Agent architecture",
+    question: "A complex change requires architectural approval before any edits. What is the best workflow?",
+    options: [
+      ["Allow edits immediately and review only after release.", "This bypasses the requested approval boundary."],
+      ["Disable all context so the agent cannot make assumptions.", "The planner still needs relevant context to produce a useful plan."],
+      ["Use a read-only planning phase, approve the plan, then authorize execution.", "Separate tool permissions and approval enforce the boundary between planning and action."],
+      ["Ask the agent to promise not to edit while retaining unrestricted write access.", "A prompt alone is weaker than an enforced tool boundary."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Agent architecture",
+    question: "What makes an agent task easier to verify?",
+    options: [
+      ["An open-ended instruction to improve everything", "An unbounded goal has no clear completion criteria."],
+      ["A request to make as many changes as possible", "Change volume is not a measure of task success."],
+      ["Only the name of the repository", "The repository name does not specify the desired behavior or constraints."],
+      ["A defined outcome, scope, acceptance criteria, and validation steps", "A concrete task contract makes completion and verification observable."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Agent architecture",
+    question: "Which request is most appropriate for a simple explanation with no file changes?",
+    options: [
+      ["Use chat to explain the relevant code.", "A conversational explanation suits a request that does not require autonomous edits."],
+      ["Assign a production deployment to a cloud agent.", "Deployment is unrelated and introduces unnecessary side effects."],
+      ["Grant write access to every repository.", "Broad permissions are unnecessary for an explanation."],
+      ["Configure a release workflow.", "A release workflow does not address the explanation request."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Agent architecture",
+    question: "What is the human's role after an agent opens a pull request?",
+    options: [
+      ["Assume the agent's confidence means the change is safe.", "Confidence does not establish correctness or safety."],
+      ["Review the diff, verification results, and applicable security concerns.", "Human review assesses the actual change and evidence before acceptance."],
+      ["Ignore required repository checks.", "Required checks remain part of the repository's controls."],
+      ["Merge immediately because the PR is an agent artifact.", "An agent-created PR is not automatically ready to merge."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Agent architecture",
+    question: "Why should acceptance criteria include observable behavior?",
+    options: [
+      ["They guarantee that the model never makes mistakes.", "Requirements cannot guarantee a model's correctness."],
+      ["They eliminate the need for tests.", "Observable criteria make testing more useful, not unnecessary."],
+      ["They let reviewers compare the result against the intended outcome.", "Observable behavior gives reviewers a basis for verification."],
+      ["They automatically grant all required permissions.", "Acceptance criteria do not grant credentials or permissions."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Tools and environments",
+    question: "What is the primary purpose of MCP in an agent system?",
+    options: [
+      ["Automatically approve all agent actions", "MCP does not replace authorization or approval."],
+      ["Store every repository secret in prompts", "Secrets should be managed through approved secret mechanisms."],
+      ["Replace the model with a build runner", "MCP connects capabilities; it does not replace the model."],
+      ["Connect the application to external tools and contextual resources", "MCP standardizes connections to capabilities and context."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Tools and environments",
+    question: "An MCP server exposes a lookup tool and a publish tool. An agent only needs lookup. What should you grant?",
+    options: [
+      ["Only the lookup tool, with appropriately scoped credentials.", "Granting the necessary capability and credential scope follows least privilege."],
+      ["Both tools because they share a server.", "Sharing a server does not make the publish action necessary."],
+      ["No controls because MCP tools are always safe.", "Tool access can have real side effects and still requires controls."],
+      ["The publish tool only.", "Publish does not meet the lookup requirement and may cause unintended changes."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Tools and environments",
+    question: "Which MCP concept represents an individual callable operation?",
+    options: [
+      ["A host", "The host is the application using MCP, not an individual callable operation."],
+      ["A tool", "An MCP tool exposes an operation the client can invoke."],
+      ["A resource", "A resource provides contextual data rather than being the callable operation described here."],
+      ["A repository branch", "A branch is a Git concept, not an MCP capability type."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Tools and environments",
+    question: "What setup workflow path is expected by Copilot coding agent on GitHub Actions?",
+    options: [
+      [".github/agents/setup.yml", "This is not the special setup workflow path."],
+      [".github/workflows/agent-install.yml", "This arbitrary workflow name is not the expected setup filename."],
+      [".github/workflows/copilot-setup-steps.yml", "Copilot recognizes this special workflow file on the default branch."],
+      ["copilot/setup.json", "This is not the expected GitHub Actions workflow path."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Tools and environments",
+    question: "Which job ID must a Copilot setup workflow contain?",
+    options: [
+      ["install", "A generic install job is not the required job ID."],
+      ["copilot-agent", "This is not the recognized setup job ID."],
+      ["setup", "A generic setup job will not be picked up as the special setup job."],
+      ["copilot-setup-steps", "Copilot looks for the job named copilot-setup-steps."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Tools and environments",
+    question: "Why add workflow_dispatch to a Copilot setup workflow?",
+    options: [
+      ["To enable manual testing of the workflow.", "Manual dispatch lets maintainers test setup independently of an agent session."],
+      ["To make Copilot detect the setup job name.", "Detection depends on the expected setup file and job, not this trigger."],
+      ["To grant the workflow write access.", "Triggers do not grant token permissions."],
+      ["To run only after another workflow finishes.", "That is a workflow_run use case."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Tools and environments",
+    question: "A setup job checks out repository code and installs dependencies without writing to GitHub. What repository contents permission is appropriate?",
+    options: [
+      ["contents: write", "Write access is unnecessary for checkout and local installation."],
+      ["contents: read", "Read access supports checkout without granting repository write access."],
+      ["issues: write", "Issue permissions do not authorize repository checkout."],
+      ["packages: write", "Publishing packages is unrelated to reading repository contents."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Tools and environments",
+    question: "A Node.js setup step needs a private registry token. What else is required besides exposing NODE_AUTH_TOKEN?",
+    options: [
+      ["Commit the token into package.json.", "Committing a credential exposes it and is not required."],
+      ["Grant contents: write to all jobs.", "Repository write permission does not configure npm authentication."],
+      ["Configure npm or setup-node to authenticate to the intended registry.", "The registry configuration must actually reference the available token."],
+      ["Disable dependency installation.", "That would prevent the setup from meeting its goal."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Tools and environments",
+    question: "Which GitHub Actions event lets another workflow invoke a reusable workflow?",
+    options: [
+      ["workflow_dispatch", "This enables an explicit manual or API dispatch."],
+      ["workflow_run", "This reacts to activity in another workflow rather than directly calling a reusable one."],
+      ["pull_request", "This reacts to pull request activity."],
+      ["workflow_call", "A reusable workflow declares workflow_call and is invoked by a caller job."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Tools and environments",
+    question: "A workflow must create an issue only after another workflow fails. Which event and check fit?",
+    options: [
+      ["workflow_run completed, with a condition on the upstream conclusion.", "The event detects completion and the conclusion condition distinguishes failure."],
+      ["workflow_dispatch, with no condition.", "Manual dispatch does not automatically react to an upstream failure."],
+      ["workflow_call, with no caller.", "A reusable workflow must be invoked and does not itself monitor completion."],
+      ["push, with no condition.", "A push event does not establish that the other workflow failed."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Memory and state",
+    question: "An agent must resume a long task after interruption. What should it preserve?",
+    options: [
+      ["Only its most recent conversational greeting", "A greeting does not capture work completed or pending."],
+      ["A durable record of progress, decisions, and remaining work", "A concise state artifact helps the next session resume accurately."],
+      ["A copy of every available secret", "Secrets are not needed as a progress record and increase exposure."],
+      ["An instruction to repeat every completed action", "Repeating completed actions can duplicate work or side effects."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Memory and state",
+    question: "A stored note contradicts the current source code. What should the agent do?",
+    options: [
+      ["Treat the older note as authoritative without checking.", "Stored context can become stale."],
+      ["Ignore the source code permanently.", "Current source is important evidence about the present implementation."],
+      ["Verify current evidence and update or discard the stale note.", "Revalidation prevents stale context from directing future work."],
+      ["Delete all repository history.", "Deleting history does not resolve the factual conflict and is destructive."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Memory and state",
+    question: "Which information is most suitable for durable project memory?",
+    options: [
+      ["A temporary test failure that has already been resolved", "Resolved, task-specific state is unlikely to be useful later."],
+      ["A user password needed for a one-time login", "Credentials must not be stored in memory."],
+      ["A speculative assumption about the architecture", "Unverified assumptions can mislead future work."],
+      ["A verified, non-obvious project convention used across tasks", "A durable and verified convention can guide future changes."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Memory and state",
+    question: "Why scope shared agent context to the current task?",
+    options: [
+      ["To reduce irrelevant or conflicting information and unnecessary exposure.", "Relevant context improves focus and limits data sharing."],
+      ["To grant a broader token automatically.", "Context scope does not grant token permissions."],
+      ["To eliminate the need to verify results.", "Relevant context does not guarantee correctness."],
+      ["To ensure all stored information is permanent.", "Information may need expiration or correction."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Memory and state",
+    question: "Two agents receive different versions of a requirement. What is the best response?",
+    options: [
+      ["Let each proceed and merge both results blindly.", "Conflicting requirements can cause incompatible changes."],
+      ["Resolve the conflict against an authoritative source and share the decision.", "A shared, verified decision prevents divergence."],
+      ["Assume the longer version is correct.", "Length does not establish authority or accuracy."],
+      ["Give both agents production credentials.", "More privileges do not resolve a context conflict."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Memory and state",
+    question: "What is context drift in a long-running task?",
+    options: [
+      ["A Git branch being renamed", "A branch rename alone is not context drift."],
+      ["A successful test completing", "A passing test is a verification result."],
+      ["The agent's working understanding diverging from current goals or facts", "Drift occurs when decisions no longer reflect the intended task or current evidence."],
+      ["An API returning a documented success response", "A successful response is not itself drift."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Evaluation",
+    question: "What is the strongest evidence that an agent met a behavior requirement?",
+    options: [
+      ["The agent says it is confident.", "Confidence is not direct evidence of behavior."],
+      ["The diff contains many lines.", "The size of a diff does not prove correctness."],
+      ["The code uses a popular library.", "A library choice alone does not demonstrate the required behavior."],
+      ["A relevant test exercises the requirement and passes.", "A targeted passing test directly checks the stated behavior."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Evaluation",
+    question: "An agent reports success, but the test command failed. What should you do?",
+    options: [
+      ["Inspect the failure and report the unsuccessful validation.", "The actual test result takes precedence over a success-shaped summary."],
+      ["Ignore the test because the agent reported success.", "A failed test cannot be treated as a pass."],
+      ["Remove all tests.", "Removing tests conceals the failure rather than addressing it."],
+      ["Merge without review.", "A failed validation requires investigation, not automatic acceptance."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Evaluation",
+    question: "A task requires a specific API response shape. Which validation is most direct?",
+    options: [
+      ["Check that the server process exists.", "A running process does not prove the response shape."],
+      ["Call the endpoint and assert the required response fields and values.", "The endpoint assertion checks the actual requested output."],
+      ["Count changed files.", "File count says nothing about the response."],
+      ["Check only that a README changed.", "Documentation changes do not verify runtime output."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Evaluation",
+    question: "An agent cannot install dependencies because a registry is unreachable. How should the failure be classified first?",
+    options: [
+      ["As proof that the application logic is correct", "An installation failure does not validate application logic."],
+      ["As a successful test run", "Tests that cannot run have not passed."],
+      ["As an environment or tool-access problem to investigate", "Registry connectivity is an environmental dependency of installation."],
+      ["As a reason to commit credentials", "Exposing credentials is unsafe and may not fix connectivity."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Evaluation",
+    question: "Why include both normal and edge cases in an agent's validation?",
+    options: [
+      ["To guarantee every possible defect is found.", "A finite test set cannot guarantee the absence of all defects."],
+      ["To avoid defining expected behavior.", "Tests need defined expectations to be meaningful."],
+      ["To replace all human review.", "Tests complement rather than replace review."],
+      ["To check intended behavior under representative and boundary conditions.", "Both ordinary and boundary inputs can reveal different failures."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Evaluation",
+    question: "A repeated workflow produces inconsistent agent outputs. What is a useful first step?",
+    options: [
+      ["Compare prompts, context, tool traces, and results against explicit criteria.", "Evidence from runs helps identify whether the issue is context, reasoning, or tool use."],
+      ["Assume all failures have the same cause.", "Different failures can have different underlying causes."],
+      ["Remove the success criteria.", "Removing criteria makes consistent evaluation harder."],
+      ["Grant all tools unrestricted access.", "Increasing privileges does not diagnose inconsistency."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Evaluation",
+    question: "What should a useful completion report include when a required test could not run?",
+    options: [
+      ["A claim that all tests passed", "An unrun test must not be reported as passing."],
+      ["The work performed, what was checked, and the test blocker", "This makes both the result and verification limitation visible."],
+      ["Only the number of files changed", "A file count omits the outcome and the blocker."],
+      ["The test command's credentials", "Credentials must not be disclosed in reports."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Multi-agent coordination",
+    question: "Two agents need to edit the same module concurrently. What reduces conflicting work?",
+    options: [
+      ["Give both identical unrestricted tasks and merge automatically.", "Overlapping ownership and automatic merging increase conflict risk."],
+      ["Hide each agent's changes from the other.", "Hidden changes make coordination harder."],
+      ["Assign clear boundaries or sequence the dependent edits.", "Defined ownership and ordering reduce overlapping modifications."],
+      ["Delete the module before both agents start.", "Deleting shared code is unrelated and destructive."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Multi-agent coordination",
+    question: "An implementation agent depends on an architecture decision. When should implementation begin?",
+    options: [
+      ["Before the decision exists, using a guess.", "A guess may invalidate the subsequent implementation."],
+      ["Only after all unrelated tasks finish.", "Unrelated tasks are not actual prerequisites."],
+      ["After production deployment.", "Deployment is not a prerequisite for making the change."],
+      ["After the required decision is available and communicated.", "A real dependency should be satisfied before dependent work begins."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Multi-agent coordination",
+    question: "What should an agent handoff contain?",
+    options: [
+      ["The outcome, relevant evidence, limitations, and next required action.", "A concrete handoff lets another agent continue without guessing."],
+      ["Only a statement that work happened.", "This omits the result, evidence, and next step."],
+      ["Every secret the agent encountered.", "Secrets should not be included in handoffs."],
+      ["A request to repeat all previous work.", "Repeating work wastes effort and may repeat side effects."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Multi-agent coordination",
+    question: "A delegated agent reports a partial result and a blocker. What should the coordinator do?",
+    options: [
+      ["Mark the task complete regardless.", "Partial work and blockers must remain visible."],
+      ["Assess the evidence, address or escalate the blocker, and track remaining work.", "Explicit recovery preserves accountability and supports completion."],
+      ["Claim that all tests passed.", "A blocker does not establish passing tests."],
+      ["Launch duplicate agents indefinitely.", "Unbounded retries waste resources and can duplicate actions."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Multi-agent coordination",
+    question: "Which task pair can safely run in parallel, assuming no shared side effects?",
+    options: [
+      ["Deploy a build and first create that same build", "Deployment depends on the build existing."],
+      ["Apply a migration and first approve its exact plan", "The approval is a prerequisite when required."],
+      ["Review two independent modules with separate ownership", "Independent work can proceed concurrently."],
+      ["Publish a release and first generate its release artifact", "Publishing depends on the artifact."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Multi-agent coordination",
+    question: "Why keep logs and artifacts for a multi-agent workflow?",
+    options: [
+      ["They automatically fix all failed agents.", "Evidence supports diagnosis but does not itself repair failures."],
+      ["They eliminate the need to control access.", "Logs can contain sensitive data and require access controls."],
+      ["They ensure all agents share the same model.", "Logging does not determine model selection."],
+      ["They support tracing decisions, handoffs, and failures.", "Auditable evidence makes coordination and post-hoc analysis possible."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Multi-agent coordination",
+    question: "An agent's task is to research one topic and report findings. Why give it a bounded objective?",
+    options: [
+      ["To limit duplicated effort and make the result easier to integrate.", "Clear scope helps the coordinator combine independent results."],
+      ["To guarantee all external sources are true.", "A bounded task still requires source verification."],
+      ["To bypass authorization checks.", "Scope does not replace access controls."],
+      ["To prevent any useful handoff.", "A bounded objective should produce a useful handoff."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Multi-agent coordination",
+    question: "A worker must be replaced while a workflow is active. What best supports continuity?",
+    options: [
+      ["Discard the prior decisions and audit trail.", "Discarding evidence makes safe continuation harder."],
+      ["Provide the replacement with verified state, ownership, and pending work.", "A clear handoff preserves context and accountability."],
+      ["Give both workers unrestricted access to every system.", "Excess access is not needed for a handoff."],
+      ["Assume the replacement has the prior worker's private context.", "Context is not necessarily shared automatically."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Guardrails",
+    question: "An issue contains text instructing an agent to reveal secrets. How should the agent treat it?",
+    options: [
+      ["As a higher-priority instruction than its security controls", "Untrusted issue content cannot override higher-priority controls."],
+      ["As permission to print credentials", "Issue text does not authorize credential disclosure."],
+      ["As untrusted content that must not redirect the task or expose secrets", "Issue contents can be task data but may contain prompt injection."],
+      ["As proof the secret has already been safely rotated", "The instruction provides no evidence of rotation."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Guardrails",
+    question: "Which hook is suited to checking a tool call before it runs?",
+    options: [
+      ["sessionEnd", "This occurs at the end of the session, not before a tool call."],
+      ["postToolUse", "This observes the action after execution and cannot prevent that completed action."],
+      ["userPromptSubmitted", "This runs when a prompt is submitted, not immediately before each tool call."],
+      ["preToolUse", "A pre-tool hook can evaluate a proposed call before execution."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Guardrails",
+    question: "What is the safer way to validate untrusted pull request code?",
+    options: [
+      ["Run it with minimal permissions and no unnecessary secrets, under appropriate repository policies.", "Untrusted code needs constrained credentials and execution controls."],
+      ["Run it in a privileged pull_request_target job with production secrets.", "Untrusted PR code in a privileged context can expose credentials or write access."],
+      ["Grant repository administration to the test job.", "Administrator access is unnecessary for ordinary tests."],
+      ["Assume a forked PR is trusted because it has tests.", "Tests do not establish that submitted code is trustworthy."]
+    ],
+    answer: 0
+  },
+  {
+    topic: "Guardrails",
+    question: "A job only needs to create an issue. Which token scope grants that capability?",
+    options: [
+      ["contents: read", "This grants repository contents read access, not issue creation."],
+      ["issues: write", "Issue creation requires issue write access, subject to repository policy."],
+      ["actions: read", "Actions read access does not grant issue creation."],
+      ["id-token: write", "OIDC token permission does not grant issue write access."]
+    ],
+    answer: 1
+  },
+  {
+    topic: "Guardrails",
+    question: "What does explicitly setting a GitHub Actions permissions map do to unspecified token permissions?",
+    options: [
+      ["It automatically grants them write access.", "Unspecified scopes are not upgraded to write."],
+      ["It leaves every unspecified scope at administrator level.", "A permissions map does not grant administrator access."],
+      ["It sets unspecified permissions to none.", "Explicit permission configuration makes unspecified permissions unavailable."],
+      ["It disables all workflow triggers.", "Permission scopes and triggers are separate settings."]
+    ],
+    answer: 2
+  },
+  {
+    topic: "Guardrails",
+    question: "What does id-token: write allow in a GitHub Actions job?",
+    options: [
+      ["It automatically grants administrator access to a cloud account.", "Cloud access also requires a matching trust policy and authorized role."],
+      ["It allows creation of GitHub issues.", "Issue creation requires issues: write."],
+      ["It permits pushing any repository branch.", "Repository pushes require appropriate contents permission and branch policy."],
+      ["It permits requesting an OIDC token for a configured identity exchange.", "OIDC permission enables token requests; external trust determines cloud access."]
+    ],
+    answer: 3
+  },
+  {
+    topic: "Guardrails",
+    question: "Which action most clearly warrants a separate human approval boundary?",
+    options: [
+      ["Deploying a change to production", "Production deployment is consequential and should follow applicable authorization controls."],
+      ["Reading a public project README", "Reading public documentation is ordinarily lower risk."],
+      ["Formatting a local scratch note", "A local, reversible note is ordinarily lower risk."],
+      ["Listing filenames in a repository", "Read-only listing is ordinarily lower risk than deployment."]
+    ],
+    answer: 0
+  }
+];
+
+const quiz = document.getElementById("quiz");
+const status = document.getElementById("status");
+const progress = document.getElementById("progress");
+const answers = Array(questions.length).fill(null);
+let current = 0;
+let showingResults = false;
+
+function element(tag, text, className) {
+  const node = document.createElement(tag);
+  if (text !== undefined) node.textContent = text;
+  if (className) node.className = className;
+  return node;
+}
+
+function button(text, action, className) {
+  const node = element("button", text, className);
+  node.type = "button";
+  node.addEventListener("click", action);
+  return node;
+}
+
+function render() {
+  const answered = answers.filter(answer => answer !== null).length;
+  const correct = answers.filter((answer, index) => answer === questions[index].answer).length;
+  status.textContent = `${answered} of ${questions.length} answered · ${correct} correct`;
+  progress.max = questions.length;
+  progress.value = answered;
+  quiz.replaceChildren();
+
+  if (showingResults) {
+    const heading = element("h2", "Your results");
+    heading.id = "question-title";
+    quiz.append(heading);
+    quiz.append(element("p", `${correct} correct out of ${answered} answered. ${questions.length - answered} unanswered.`));
+    quiz.append(element("p", "Use Review questions to revisit your answers or complete any skipped questions."));
+    const controls = element("div", undefined, "controls");
+    controls.append(button("Review questions", () => { showingResults = false; current = 0; render(); }));
+    controls.append(button("Start over", reset, "primary"));
+    quiz.append(controls);
+    return;
+  }
+
+  const item = questions[current];
+  quiz.append(element("p", `Question ${current + 1} of ${questions.length} · ${item.topic}`, "meta"));
+  const heading = element("h2", item.question);
+  heading.id = "question-title";
+  quiz.append(heading);
+  const options = element("div", undefined, "options");
+  item.options.forEach(([text], index) => {
+    const choice = button(`${String.fromCharCode(65 + index)}. ${text}`, () => {
+      answers[current] = index;
+      render();
+    }, "option");
+    if (answers[current] !== null) {
+      choice.disabled = true;
+      if (index === item.answer) choice.classList.add("correct");
+      else if (index === answers[current]) choice.classList.add("incorrect");
+    }
+    options.append(choice);
+  });
+  quiz.append(options);
+
+  if (answers[current] !== null) {
+    const feedback = element("div", undefined, "feedback");
+    feedback.setAttribute("role", "status");
+    const selected = answers[current];
+    feedback.append(element("h3", selected === item.answer ? "Correct" : `Not quite — the correct answer is ${String.fromCharCode(65 + item.answer)}.`));
+    const explanations = element("ul");
+    item.options.forEach(([text, explanation], index) => {
+      const entry = element("li");
+      const label = element("strong", `${String.fromCharCode(65 + index)}. ${text} `);
+      entry.append(label, document.createTextNode(explanation));
+      explanations.append(entry);
+    });
+    feedback.append(explanations);
+    quiz.append(feedback);
+  }
+
+  const controls = element("div", undefined, "controls");
+  const previous = button("Previous", () => { current--; render(); });
+  previous.disabled = current === 0;
+  controls.append(previous);
+  controls.append(button(current === questions.length - 1 ? "View results" : "Next", () => {
+    if (current === questions.length - 1) showingResults = true;
+    else current++;
+    render();
+  }, "primary"));
+  quiz.append(controls);
+}
+
+function reset() {
+  if (!confirm("Clear all answers and start over?")) return;
+  answers.fill(null);
+  current = 0;
+  showingResults = false;
+  render();
+}
+
+render();
+</script>
+</body>
+</html>
