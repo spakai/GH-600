@@ -3,6 +3,8 @@
 **Exam date: 27 November 2026**
 **Purpose:** fast revision of agentic development concepts and GitHub Copilot workflows.
 
+Practice with the [interactive quiz](./quiz.html): 45 original questions with explanations for every answer. Progress lasts for the current page session.
+
 > This workspace identifies GH-600 as “GitHub Agentic AI Developer,” but does not include an official exam blueprint. Use this as a topic guide, and check the current GitHub Learn exam page for the assessed domains, format, and feature availability.
 
 ## 1. Agentic AI: the core loop
