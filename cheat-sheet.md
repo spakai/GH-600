@@ -213,6 +213,14 @@ The snippet assumes the runner has a suitable Node version; configure the projec
 | `workflow_run` | React to another workflow run |
 | `workflow_call` | Reusable workflow called by another workflow |
 
+**`workflow_*` use cases:**
+
+| Trigger | Example use cases | Key distinction |
+|---|---|---|
+| `workflow_dispatch` | Manually test Copilot setup steps; start an on-demand deployment with chosen inputs | Started by a user or API; the workflow file must exist on the default branch. Copilot runs its setup separately when an agent session starts. |
+| `workflow_call` | Share a standard build-and-test workflow across repositories; reuse a common security scan in multiple pipelines | The caller invokes the reusable workflow at the job level with `uses:`; inputs and secrets can be passed explicitly. |
+| `workflow_run` | Create an issue after validation fails; deploy after a build succeeds | Reacts to another workflow's run; `completed` includes failures, so check the upstream conclusion before a success-only or failure-only action. |
+
 Prefer `pull_request` when testing PR code. Do not execute untrusted PR code in a privileged `pull_request_target` context with secrets or write access. Read permissions limit token authority, but running PR code still executes untrusted code. Agent approval gates and repository Actions policies may also affect when CI runs.
 
 To retain failure evidence, an upload step can use `if: always()`; this allows the step to run after earlier failures but does not create missing evidence. Sanitize files before uploading and set a suitable retention period.
