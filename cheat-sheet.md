@@ -169,6 +169,12 @@ Source: [Microsoft Learn study guide](https://learn.microsoft.com/en-us/credenti
 
 For complex work, use inspect → plan → validate plan → execute → verify. For a small, reversible edit, use bounded execution with appropriate checks. Treat production release, destructive changes, secret changes, and merges as separate consequential actions requiring their applicable authorization and protections.
 
+**Concurrency-style control:** `concurrency` limits how many tasks can execute at once; `queue:max` limits how many additional tasks can wait. For example, `concurrency: 4` and `queue:max: 100` allow 4 active tasks and up to 100 queued tasks. Requests beyond the queue limit require an overflow policy such as rejection, dropping, or backpressure.
+
+**Rehydrate state:** restore persisted workflow context—such as conversation history, task progress, tool results, artifacts, and pending decisions—so an agent can continue after a pause, restart, failure, or handoff. Rehydrating reconstructs execution state; it is more than replaying the original prompt.
+
+**Opaque internal state:** provider-managed state whose structure is hidden from the caller. Preserve and return it as an opaque token, but do not parse, edit, or depend on its format. If persisted state must be understood, validated, or migrated by application code, use an explicit versioned schema instead.
+
 ### Copilot CLI permission reminder
 
 A narrow prompt does not narrow the credentials or tools available to the process. Use scoped credentials, grant only the needed tools, and verify CLI flags against the installed version.
@@ -290,7 +296,11 @@ When permissions are explicitly listed, unspecified permissions become `none`. O
 
 **Recall:** start → guide; prompt → log; pre → prevent; post → record. Native repository hook configuration is stored in JSON files under `.github/hooks/`; ensure the scripts exist and paths resolve from the configured working directory.
 
-For a `preToolUse` handler, the script's logic determines which calls it denies. Exiting successfully without a decision leaves normal permission checks in effect; it does not grant unrestricted access. An escalation message does not create an issue unless a separate authorized action does so. Regex command filters are not a complete security boundary; apply scoped credentials and execution controls too. Log prompts only with appropriate access, retention, and secret redaction.
+**Do not confuse Copilot CLI hooks with Git hooks:** `.github/hooks/*.json` contains GitHub Copilot CLI hook configuration. Standard Git hooks are local executable scripts stored in `.git/hooks/` (or the directory set by Git's `core.hooksPath`), not JSON configuration files. The `.github/hooks/` location is therefore product-specific, whereas Git's built-in hook mechanism is repository-local and script-based.
+
+Use `preToolUse` for cross-surface allow/deny decisions before a tool executes. `permissionRequest` is CLI-only and should not be treated as an available hook on every Copilot surface. For a `preToolUse` handler, the script's logic determines which calls it denies. Exiting successfully without a decision leaves normal permission checks in effect; it does not grant unrestricted access. An escalation message does not create an issue unless a separate authorized action does so. Regex command filters are not a complete security boundary; apply scoped credentials and execution controls too. Log prompts only with appropriate access, retention, and secret redaction.
+
+In an audit-style record, `operation_type` identifies **what kind of action occurred**—for example, `read`, `write`, `execute`, `delete`, `login`, or `permission_request`. It supports filtering, policy checks, reporting, and correlation without replacing details such as the actor, target resource, timestamp, or outcome. Keep values consistent and bounded to a documented taxonomy so audit consumers can classify events reliably.
 
 ## 10. Study plan: 12–27 November
 
