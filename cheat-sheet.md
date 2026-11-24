@@ -339,9 +339,18 @@ When permissions are explicitly listed, unspecified permissions become `none`. O
 
 **Do not confuse Copilot CLI hooks with Git hooks:** `.github/hooks/*.json` contains GitHub Copilot CLI hook configuration. Standard Git hooks are local executable scripts stored in `.git/hooks/` (or the directory set by Git's `core.hooksPath`), not JSON configuration files. The `.github/hooks/` location is therefore product-specific, whereas Git's built-in hook mechanism is repository-local and script-based.
 
-**Why a PowerShell-only repository hook may not protect a Copilot cloud agent:** a raw command is not a registered hook; the `.github/hooks/*.json` configuration must declare a supported event and handler. The cloud agent's runner may also lack PowerShell (`pwsh`), so the command can fail to execute. Git hooks under `.git/hooks/` are local and are not automatically carried into cloud-agent runs. Validate the hook configuration and runtime in the agent environment, and do not rely on an unverified hook as an enforcement boundary.
+**Why a PowerShell-only repository hook may not protect a Copilot cloud agent:** a raw command is not a registered hook; the `.github/hooks/*.json` configuration must declare a supported event and handler. The cloud agent runs in Linux and honors the `bash` field (or the `command` fallback), not the `powershell` field. Git hooks under `.git/hooks/` are local and are not automatically carried into cloud-agent runs. Validate the hook configuration and runtime in the agent environment, and do not rely on an unverified hook as an enforcement boundary.
 
-Use `preToolUse` for cross-surface allow/deny decisions before a tool executes. `permissionRequest` is CLI-only and should not be treated as an available hook on every Copilot surface. For a `preToolUse` handler, the script's logic determines which calls it denies. Exiting successfully without a decision leaves normal permission checks in effect; it does not grant unrestricted access. An escalation message does not create an issue unless a separate authorized action does so. Regex command filters are not a complete security boundary; apply scoped credentials and execution controls too. Log prompts only with appropriate access, retention, and secret redaction.
+Use `preToolUse` for allow/deny decisions before a tool executes. `permissionRequest` is CLI-only and should not be treated as an available hook on every Copilot surface. To block a tool, write one JSON object to stdout:
+
+```json
+{
+  "permissionDecision": "deny",
+  "permissionDecisionReason": "Blocked by policy: this operation is not allowed."
+}
+```
+
+The reason is required with `deny`. In the cloud agent, `ask` is treated as `deny` because no user is available to answer. Exiting successfully without a decision leaves normal permission checks in effect; it does not grant unrestricted access. An escalation message does not create an issue unless a separate authorized action does so. Regex command filters are not a complete security boundary; apply scoped credentials and execution controls too. Log prompts only with appropriate access, retention, and secret redaction.
 
 In an audit-style record, `operation_type` identifies **what kind of action occurred**—for example, `read`, `write`, `execute`, `delete`, `login`, or `permission_request`. It supports filtering, policy checks, reporting, and correlation without replacing details such as the actor, target resource, timestamp, or outcome. Keep values consistent and bounded to a documented taxonomy so audit consumers can classify events reliably.
 
