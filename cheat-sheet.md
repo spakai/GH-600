@@ -272,6 +272,8 @@ Configure the `production` environment's protection rules to require designated 
 | `workflow_call` | Share a standard build-and-test workflow across repositories; reuse a common security scan in multiple pipelines | The caller invokes the reusable workflow at the job level with `uses:`; inputs and secrets can be passed explicitly. |
 | `workflow_run` | Create an issue after validation fails; deploy after a build succeeds | Reacts to another workflow's run; `completed` includes failures, so check the upstream conclusion before a success-only or failure-only action. |
 
+**Matrix fan-out limit:** GitHub Actions allows at most 256 matrix-generated jobs per workflow run. A matrix with 300 agent entries exceeds that limit; batch the work across workflow runs and account for runner capacity and cost. `max-parallel` limits simultaneous jobs but does not raise the total limit.
+
 **Concurrency with `cancel-in-progress: true`:** runs sharing the same `concurrency.group` are limited to one running and one pending run. A newly queued run replaces an older pending run; with `cancel-in-progress: true`, it also cancels the currently running run in that group. This helps avoid spending CI time on stale commits, but is unsuitable for work that should not be interrupted, such as deployments or other non-idempotent operations.
 
 Include `github.workflow` in a concurrency group to namespace it per workflow: groups are repository-wide, so omitting it can make different workflows on the same PR branch cancel or replace each other's runs. `github.head_ref || github.run_id` groups PR runs by source branch and gives non-PR events a unique fallback.
