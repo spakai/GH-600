@@ -185,6 +185,14 @@ copilot --allow-tool='shell(git:*)' --deny-tool='shell(git push)'
 
 Allow/deny controls illustrate tool restrictions; they are not a complete sandbox or a substitute for credential scoping.
 
+For an unattended prompt run in CI, add `--no-ask-user` so the agent does not pause to request more user input:
+
+```bash
+copilot -p "Run the requested checks" --no-ask-user
+```
+
+This prevents follow-up questions; it does not grant tool permissions or replace explicit permission configuration.
+
 ### GitHub Actions: validation and security
 
 ```yaml
