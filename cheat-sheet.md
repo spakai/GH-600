@@ -274,6 +274,8 @@ Configure the `production` environment's protection rules to require designated 
 
 **Concurrency with `cancel-in-progress: true`:** runs sharing the same `concurrency.group` are limited to one running and one pending run. A newly queued run replaces an older pending run; with `cancel-in-progress: true`, it also cancels the currently running run in that group. This helps avoid spending CI time on stale commits, but is unsuitable for work that should not be interrupted, such as deployments or other non-idempotent operations.
 
+Include `github.workflow` in a concurrency group to namespace it per workflow: groups are repository-wide, so omitting it can make different workflows on the same PR branch cancel or replace each other's runs. `github.head_ref || github.run_id` groups PR runs by source branch and gives non-PR events a unique fallback.
+
 **`github.event.client_payload`** is for custom data sent with a `repository_dispatch` event, for example `${{ github.event.client_payload.environment }}`. It is not the input mechanism for `workflow_dispatch`; use the `inputs` context for manually supplied workflow inputs.
 
 Prefer `pull_request` when testing PR code. Do not execute untrusted PR code in a privileged `pull_request_target` context with secrets or write access. Read permissions limit token authority, but running PR code still executes untrusted code. Agent approval gates and repository Actions policies may also affect when CI runs.
@@ -281,6 +283,8 @@ Prefer `pull_request` when testing PR code. Do not execute untrusted PR code in 
 **`github.ref`:** on a push to `main`, it is `refs/heads/main` (branch refs use `refs/heads/<branch>`). On `pull_request`, it is commonly `refs/pull/<number>/merge`, the PR's synthetic merge ref—not the source branch name. Use `github.head_ref` for the PR source branch and `github.base_ref` for the target branch. `pull_request_target` has different ref behavior: it uses the base branch ref.
 
 To retain failure evidence, an upload step can use `if: always()`; this allows the step to run after earlier failures but does not create missing evidence. Sanitize files before uploading and set a suitable retention period.
+
+For a required review artifact, set `if-no-files-found: error` on `actions/upload-artifact`; the upload step fails if no files match, rather than only warning.
 
 ### Workflow completion and failure escalation
 
