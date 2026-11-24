@@ -349,7 +349,7 @@ When permissions are explicitly listed, unspecified permissions become `none`. O
 
 **Why a PowerShell-only repository hook may not protect a Copilot cloud agent:** a raw command is not a registered hook; the `.github/hooks/*.json` configuration must declare a supported event and handler. The cloud agent runs in Linux and honors the `bash` field (or the `command` fallback), not the `powershell` field. Git hooks under `.git/hooks/` are local and are not automatically carried into cloud-agent runs. Validate the hook configuration and runtime in the agent environment, and do not rely on an unverified hook as an enforcement boundary.
 
-Use `preToolUse` for allow/deny decisions before a tool executes. `permissionRequest` is CLI-only and should not be treated as an available hook on every Copilot surface. To block a tool, write one JSON object to stdout:
+For cloud-agent tool control, use a repository-level `preToolUse` hook to inspect shell-tool arguments and deny prohibited commands before execution. `permissionRequest` is ineffective in the cloud agent because its tool calls are pre-approved. To block a tool, write one JSON object to stdout:
 
 ```json
 {
