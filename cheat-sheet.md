@@ -325,7 +325,7 @@ When permissions are explicitly listed, unspecified permissions become `none`. O
 
 **Don't confuse:** `actions: write` manages Actions operations; it does not grant issue creation. `failure()` checks the current execution context; use `github.event.workflow_run.conclusion` for the upstream run. A merged PR is a `closed` event plus a merged-state check—there is no `merged` activity type for `pull_request`.
 
-### Copilot CLI hooks
+### Copilot CLI and cloud-agent hooks
 
 | Hook | When it runs | Typical use |
 |---|---|---|
@@ -335,9 +335,9 @@ When permissions are explicitly listed, unspecified permissions become `none`. O
 | `postToolUse` | After a tool executes | Record results; cannot prevent the completed action |
 | `sessionEnd` | Session ends | Cleanup or session audit summary |
 
-**Recall:** start → guide; prompt → log; pre → prevent; post → record. Native repository hook configuration is stored in JSON files under `.github/hooks/`; ensure the scripts exist and paths resolve from the configured working directory.
+**Recall:** start → guide; prompt → log; pre → prevent; post → record. Store repository-level hook configuration as JSON files in `.github/hooks/*.json` at the repository root. Copilot CLI and cloud agent load hooks from this location; cloud agent supports only a subset of events, so verify event and command compatibility. Ensure scripts exist and paths resolve from the configured working directory.
 
-**Do not confuse Copilot CLI hooks with Git hooks:** `.github/hooks/*.json` contains GitHub Copilot CLI hook configuration. Standard Git hooks are local executable scripts stored in `.git/hooks/` (or the directory set by Git's `core.hooksPath`), not JSON configuration files. The `.github/hooks/` location is therefore product-specific, whereas Git's built-in hook mechanism is repository-local and script-based.
+**Do not confuse Copilot hooks with Git hooks:** `.github/hooks/*.json` contains Copilot repository-hook configuration. Standard Git hooks are local executable scripts stored in `.git/hooks/` (or the directory set by Git's `core.hooksPath`), not JSON configuration files. The `.github/hooks/` location is therefore product-specific, whereas Git's built-in hook mechanism is repository-local and script-based.
 
 **Why a PowerShell-only repository hook may not protect a Copilot cloud agent:** a raw command is not a registered hook; the `.github/hooks/*.json` configuration must declare a supported event and handler. The cloud agent runs in Linux and honors the `bash` field (or the `command` fallback), not the `powershell` field. Git hooks under `.git/hooks/` are local and are not automatically carried into cloud-agent runs. Validate the hook configuration and runtime in the agent environment, and do not rely on an unverified hook as an enforcement boundary.
 
