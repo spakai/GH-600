@@ -210,6 +210,37 @@ jobs:
 
 The snippet assumes the runner has a suitable Node version; configure the project's required version in a real workflow. `pull-requests: read` is for reading PR metadata; checkout and local tests generally need only `contents: read`.
 
+**`GITHUB_OUTPUT` vs. `GITHUB_ENV`:**
+
+| File | Purpose | How a later step reads it |
+|---|---|---|
+| `GITHUB_OUTPUT` | Set a named output on the current step | `steps.<step-id>.outputs.<name>` |
+| `GITHUB_ENV` | Add an environment variable for subsequent steps in the same job | `$NAME` or `${{ env.NAME }}` |
+
+Writes to either file do not change the current step. Use outputs for explicit step dependencies and environment files for ambient job configuration. To share data across jobs, expose a job output or use another supported mechanism; `GITHUB_ENV` variables do not cross job boundaries automatically.
+
+```yaml
+- id: build
+  run: echo "artifact=app.zip" >> "$GITHUB_OUTPUT"
+- run: echo "${{ steps.build.outputs.artifact }}"
+
+- run: echo "BUILD_DIR=dist" >> "$GITHUB_ENV"
+- run: echo "$BUILD_DIR"
+```
+
+To gate production deployment by humans, use a protected **GitHub Actions environment** with required reviewers:
+
+```yaml
+jobs:
+  deploy-production:
+    environment:
+      name: production
+    steps:
+      # deployment steps
+```
+
+Configure the `production` environment's protection rules to require designated reviewers. The deployment job pauses until an authorized reviewer approves it, providing an enforced and auditable gate. A workflow `if:` condition or comment is not a substitute for an environment approval gate.
+
 | Syntax / clue | Meaning |
 |---|---|
 | `uses:` | Invoke an action |
@@ -218,18 +249,28 @@ The snippet assumes the runner has a suitable Node version; configure the projec
 | `opened` / `synchronize` | PR created / PR head updated |
 | `ready_for_review` | Draft PR marked ready |
 | `workflow_dispatch` | Explicit workflow dispatch |
+| `repository_dispatch` | External API-triggered custom event |
 | `workflow_run` | React to another workflow run |
 | `workflow_call` | Reusable workflow called by another workflow |
+
+**Git hooks vs. GitHub Actions triggers:** Git hooks are local scripts run by Git during operations such as `commit` or `push` (for example, `pre-commit`); they are usually stored in `.git/hooks/` and are not shared by committing the repository. GitHub Actions triggers are workflow `on:` events such as `push` or `pull_request`; they run jobs on a GitHub-hosted or configured self-hosted runner and are defined in versioned workflow files. Local hooks help with immediate developer feedback, while Actions provide shared CI; do not rely on client-side hooks alone to enforce policy.
 
 **`workflow_*` use cases:**
 
 | Trigger | Example use cases | Key distinction |
 |---|---|---|
 | `workflow_dispatch` | Manually test Copilot setup steps; start an on-demand deployment with chosen inputs | Started by a user or API; the workflow file must exist on the default branch. Copilot runs its setup separately when an agent session starts. |
+| `repository_dispatch` | Start a workflow from an external system with custom event data | Read caller-supplied JSON fields from `github.event.client_payload.<field>`; the request also supplies an `event_type` matched by `types:`. Validate payload values before using them in privileged actions. |
 | `workflow_call` | Share a standard build-and-test workflow across repositories; reuse a common security scan in multiple pipelines | The caller invokes the reusable workflow at the job level with `uses:`; inputs and secrets can be passed explicitly. |
 | `workflow_run` | Create an issue after validation fails; deploy after a build succeeds | Reacts to another workflow's run; `completed` includes failures, so check the upstream conclusion before a success-only or failure-only action. |
 
+**Concurrency with `cancel-in-progress: true`:** runs sharing the same `concurrency.group` are limited to one running and one pending run. A newly queued run replaces an older pending run; with `cancel-in-progress: true`, it also cancels the currently running run in that group. This helps avoid spending CI time on stale commits, but is unsuitable for work that should not be interrupted, such as deployments or other non-idempotent operations.
+
+**`github.event.client_payload`** is for custom data sent with a `repository_dispatch` event, for example `${{ github.event.client_payload.environment }}`. It is not the input mechanism for `workflow_dispatch`; use the `inputs` context for manually supplied workflow inputs.
+
 Prefer `pull_request` when testing PR code. Do not execute untrusted PR code in a privileged `pull_request_target` context with secrets or write access. Read permissions limit token authority, but running PR code still executes untrusted code. Agent approval gates and repository Actions policies may also affect when CI runs.
+
+**`github.ref`:** on a push to `main`, it is `refs/heads/main` (branch refs use `refs/heads/<branch>`). On `pull_request`, it is commonly `refs/pull/<number>/merge`, the PR's synthetic merge ref—not the source branch name. Use `github.head_ref` for the PR source branch and `github.base_ref` for the target branch. `pull_request_target` has different ref behavior: it uses the base branch ref.
 
 To retain failure evidence, an upload step can use `if: always()`; this allows the step to run after earlier failures but does not create missing evidence. Sanitize files before uploading and set a suitable retention period.
 
