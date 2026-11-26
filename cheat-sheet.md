@@ -709,3 +709,47 @@ GitHub Actions artifact storage associated with the workflow run.
 
 [GitHub Docs · Workflow artifacts](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflow-artifacts)
 
+#### GitHub Actions command files
+
+These variables contain runner-managed **file paths**. Append to the quoted path with `>>` to send information to GitHub Actions.
+
+| Command file | Write | Where it shows up |
+| --- | --- | --- |
+| `$GITHUB_STEP_SUMMARY` | Markdown | On the workflow run’s **Summary** page. Use it for a test report, diagnosis, or handoff that a person can scan. Each step has its own file. GitHub groups the step summaries by job. |
+| `$GITHUB_OUTPUT` | `key=value` | As a step output. Give the producing step an `id` and read it with `steps.<id>.outputs.<key>`. To read it in a dependent job, expose it as a job output and use `needs.<job>.outputs.<key>`. |
+| `$GITHUB_ENV` | `NAME=value` | As an environment variable in later steps of the same job. The step that writes it must set its own shell variable if it needs the value immediately. |
+| `$GITHUB_PATH` | One directory per line | Prepended to `PATH` for later steps in the same job. |
+| `$GITHUB_STATE` | `key=value` | In the same action’s lifecycle, such as passing a temp path from its main script to its post cleanup script as `STATE_key`. |
+
+```yaml
+steps:
+  - name: Record build information
+    id: meta
+    run: |
+      image_tag="${GITHUB_SHA::7}"
+      printf 'image_tag=%s\n' "$image_tag" >> "$GITHUB_OUTPUT"
+      printf '### Build metadata\n\n- Image tag: `%s`\n' "$image_tag" >> "$GITHUB_STEP_SUMMARY"
+      printf 'BUILD_MODE=ci\n' >> "$GITHUB_ENV"
+
+  - name: Use the output and environment variable
+    env:
+      IMAGE_TAG: ${{ steps.meta.outputs.image_tag }}
+    run: printf 'Mode=%s, tag=%s\n' "$BUILD_MODE" "$IMAGE_TAG"
+```
+
+**Memory cue** · Summary for the reader. Output for a workflow expression. Env for a later shell. Path for command lookup. State for action cleanup. Use an artifact when readers need to download a file, such as the complete Surefire report.
+
+#### Other common `GITHUB_*` variables
+
+| Variable | What it tells you |
+| --- | --- |
+| `GITHUB_REPOSITORY`, `GITHUB_WORKFLOW`, `GITHUB_JOB` | The `owner/repo`, workflow name, and job ID. |
+| `GITHUB_SHA`, `GITHUB_REF`, `GITHUB_REF_NAME` | The event’s commit SHA, full ref, and short ref. On an ordinary open PR’s `pull_request` run, `GITHUB_SHA` can refer to the generated merge commit. Use `github.event.pull_request.head.sha` for the source commit. |
+| `GITHUB_HEAD_REF`, `GITHUB_BASE_REF` | The PR’s source and target branch names on PR events. |
+| `GITHUB_EVENT_NAME`, `GITHUB_EVENT_PATH` | The event type, such as `pull_request`, and the path to its JSON payload. |
+| `GITHUB_RUN_ID`, `GITHUB_RUN_NUMBER`, `GITHUB_RUN_ATTEMPT` | The run’s repository-wide ID, its sequence number for the workflow, and its retry attempt. A rerun keeps the same run ID and increments the attempt. |
+| `GITHUB_WORKSPACE`, `GITHUB_ACTOR` | The default workspace directory and the original triggering account. |
+| `GITHUB_TOKEN` | An automatically issued job token. Reference it via `${{ github.token }}` or `${{ secrets.GITHUB_TOKEN }}`. If a shell command expects a token variable, pass it explicitly with `env`, for example `GH_TOKEN: ${{ github.token }}` for GitHub CLI. |
+
+[GitHub Docs · Workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands) · [Default variables](https://docs.github.com/en/actions/reference/workflows-and-actions/variables)
+
