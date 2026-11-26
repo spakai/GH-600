@@ -426,6 +426,77 @@ In an audit-style record, `operation_type` identifies **what kind of action occu
 
 The MCP registry v0.1 routes are `/v0.1/servers`, `/v0.1/servers/{serverName}/versions/latest`, and `/v0.1/servers/{serverName}/versions/{version}`.
 
+#### Allow one approved Sentry tool
+
+The `mcp-servers.sentry` entry configures the connection. The agent’s `tools` list determines which tools it can call. Start read-only with `tools: ["read", "search"]`, then add the exact server tool name after approval.
+
+```yaml
+# Example if the configured Sentry server exposes get_issue
+tools: ["read", "search", "sentry/get_issue"]
+```
+
+Use `sentry/*` to enable every tool exposed by that server. Shell execution stays outside both allowlists because neither includes `execute` or a shell alias.
+
+[GitHub Docs · Custom agent tool configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration)
+
+#### Cloud Agent and VS Code Agent
+
+| Capability | Copilot cloud agent | VS Code IDE agent |
+| --- | --- | --- |
+| Execution | Hosted checkout. Delegates work asynchronously and can prepare a PR. | Active workspace and terminal, including a connected remote host or dev container. |
+| MCP tools | Supported. A tool can look up an issue or return runbook text. | Supported, alongside IDE and extension tools. |
+| MCP resources | Unsupported. | Supported. Attach server-provided data, such as a runbook, as context. |
+| MCP prompts | Unsupported. | Supported. Invoke server-provided templates from chat. |
+| Task requests and instructions | Accepts task prompts and supports repository instructions, custom agents, and skills. | Accepts task prompts and also supports reusable IDE `.prompt.md` files. |
+| Environment | Uses hosted files, credentials, and network access. Local files, IDE settings, and local credentials do not automatically carry over. The firewall limits outbound access by default. | Uses the workspace environment, subject to available tools and approvals. |
+
+**Remember** · A task prompt is your request. A `.prompt.md` file is a reusable IDE task template. An MCP prompt is a template published by a server. Cloud agent and code review support MCP tools only. For servers configured in repository settings or agent profiles, they also lack support for remote servers that use OAuth.
+
+| Configuration scope | What it controls |
+| --- | --- |
+| Enterprise registry | Set the registry URL and use **Registry only** to restrict supported clients to approved servers. |
+| Repository MCP JSON | Configure servers under **Settings → Copilot → MCP servers** for cloud agent and code review. |
+| Custom agent profile | Select callable tools with `tools`. Use `server/tool` for one tool or `server/*` for a namespace. |
+| Default GitHub MCP server | Supplies repo, issue, and PR access without custom server JSON. Its default cloud-agent token is scoped to read access in the current repository. |
+
+[GitHub Docs · Repository MCP configuration](https://docs.github.com/en/copilot/how-tos/copilot-on-github/customize-copilot/configure-mcp-servers) · [VS Code · MCP servers](https://code.visualstudio.com/docs/agent-customization/mcp-servers)
+
+#### Cloud Agent setup with private npm packages
+
+Use `packages: read`, `pull-requests: none`, and the exact job ID `copilot-setup-steps`. Put the workflow in `.github/workflows/copilot-setup-steps.yml` on the default branch. Give the repository **Read** access under the private package’s **Manage Actions access** settings. Pass the workflow token to npm only on the install step.
+
+```yaml
+name: Copilot Setup Steps
+
+on:
+  workflow_dispatch:
+  pull_request:
+    paths:
+      - .github/workflows/copilot-setup-steps.yml
+
+permissions:
+  contents: read
+  packages: read
+  pull-requests: none
+
+jobs:
+  copilot-setup-steps:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+          registry-url: https://npm.pkg.github.com
+      - run: npm ci
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+```
+
+If the repository uses both npmjs.org and GitHub Packages, configure the organization’s npm scope for the GitHub Packages registry so public packages still resolve from npmjs.org.
+
+[GitHub Docs · Private dependencies for cloud agent](https://docs.github.com/en/copilot/tutorials/cloud-agent/give-access-to-resources) · [GitHub Packages · npm registry](https://docs.github.com/en/packages/working-with-a-github-packages-registry/working-with-the-npm-registry)
+
 ### Hooks, human approval, and agent handoffs
 
 | Topic | What to remember |
@@ -462,6 +533,13 @@ The MCP registry v0.1 routes are `/v0.1/servers`, `/v0.1/servers/{serverName}/ve
 
 [GitHub Docs · Hooks reference](https://docs.github.com/en/copilot/reference/hooks-reference)
 
+#### Production rulesets and resume state
+
+- **Merge requirements.** A ruleset can require a PR, two approvals, code-owner approval for covered paths, and required CI checks such as build, test, and CodeQL. Strict status checks require the PR branch to be up to date with its base. Passing CI still leaves review requirements in force.
+- **Secret-backed execution.** For a job that references a protected environment, required reviewers can gate access to its environment secrets. A manual trigger and approval to run Copilot-generated workflows are separate from environment approval.
+- **Path risk.** Documentation and issue templates can be classified as low risk, source and tests as medium risk, and auth, deploy, and compliance paths as high risk. Classification alone creates no review exemption. For overlapping patterns such as `src/**` and `src/auth/**`, define precedence in the policy implementation. These policy labels are illustrative rather than native GitHub ruleset keys.
+- **Resume paused work.** Carry forward accepted architecture decisions, explicitly exclude abandoned approaches, and retest failures that apply to the current PR revision. Replace “continue from before” with the current commit, completed work, remaining task, accepted constraints, and the next validation target.
+
 ### Actions triggers, conditions, and concurrency
 
 | Topic | What to remember |
@@ -495,16 +573,36 @@ if: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
 
 #### Cancel older validation runs for the same PR
 
-Group by PR number and enable cancellation. Use this at the workflow level for a PR-only validation workflow.
+Suppose **Validate PR** runs for PR **#42** from `feature/adaptive-limiter` into `main`.
+
+| Context value | Example |
+| --- | --- |
+| `github.workflow` | `Validate PR` |
+| `github.head_ref` | `feature/adaptive-limiter` |
+| `github.event.pull_request.number` | `42` |
+
+**Group by source branch**
 
 ```yaml
-on:
-  pull_request:
+name: Validate PR
+on: pull_request
 
 concurrency:
-  group: pr-validation-${{ github.event.pull_request.number }}
+  group: ${{ github.workflow }}-${{ github.head_ref }}
   cancel-in-progress: true
 ```
+
+The group resolves to `Validate PR-feature/adaptive-limiter`. A new commit to the same PR triggers a run in the same group and cancels the older in-progress run. A PR from `feature/retry-policy` gets its own group.
+
+**Group by PR number**
+
+```yaml
+concurrency:
+  group: ${{ github.workflow }}-pr-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+```
+
+PR **#42** resolves to `Validate PR-pr-42` and PR **#43** resolves to `Validate PR-pr-43`. Use the PR number to scope cancellation to one PR, including when two PRs share a source branch name. Omit `queue: max` when using `cancel-in-progress: true`.
 
 | Group key | What it groups |
 | --- | --- |
