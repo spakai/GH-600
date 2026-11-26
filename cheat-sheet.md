@@ -1,9 +1,13 @@
-# GH-600 — GitHub Agentic AI Developer
+# GH-600 Master Cheat Sheet
+
+[Core cheat sheet](#1-agentic-ai-the-core-loop) · [Practice gaps by test](#practice-gaps-by-test)
+
+The core reference comes from the [GitHub cheat sheet](https://github.com/spakai/GH-600/blob/main/cheat-sheet.md). The practice review at the end contains 59 entries across six sets, including repeated topics.
 
 **Exam date: 27 November 2026**
 **Purpose:** fast revision of agentic development concepts and GitHub Copilot workflows.
 
-Practice with the [interactive quiz](./quiz.html): 45 original questions with explanations for every answer. Progress lasts for the current page session.
+Practice with the [interactive quiz](https://github.com/spakai/GH-600/blob/main/quiz.html): 45 original questions with explanations for every answer. Progress lasts for the current page session.
 
 > This workspace identifies GH-600 as “GitHub Agentic AI Developer,” but does not include an official exam blueprint. Use this as a topic guide, and check the current GitHub Learn exam page for the assessed domains, format, and feature availability.
 
@@ -401,3 +405,247 @@ Aim for **45–75 minutes per day**. Spend each session on active recall and a s
 - [GitHub Docs — Extending Copilot Chat with MCP servers](https://docs.github.com/en/copilot/how-tos/copilot-in-your-ide/customize-copilot/extend-copilot-with-tools-and-context/extend-copilot-chat-with-mcp)
 
 **Last prepared:** 11 November 2026. Product capabilities and exam objectives can change; confirm details in GitHub Learn shortly before the exam.
+
+## Practice gaps by test
+
+### Practice 1 · Three questions discussed individually
+
+The shared chat lists 15 missed questions and discusses Q35, Q42, and Q50 individually. This sheet focuses on those three. The chat does not identify which three were missed specifically in Practice 1.
+
+#### Q35 · Run a step when the PR has a `preview` label
+
+```yaml
+if: ${{ contains(github.event.pull_request.labels.*.name, 'preview') }}
+```
+
+- **Remember** · PR → labels → every name → contains `preview`.
+- **Why it works** · `labels` is a list of objects. `*.name` pulls out each label’s name. `contains()` checks for an element in that list.
+- **Exam trap** · `pull_request.label` treats the collection as one field. `github.ref` is a Git ref. Both miss the label list.
+- **Trigger detail** · If adding the label itself should start a new run, include the `labeled` activity type under `pull_request.types`. The step condition is evaluated only after a workflow run starts.
+
+[GitHub Docs · Expressions](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions)
+
+#### Q42 · Caller and deployment environment define the same secret
+
+**Answer** · The deployment job uses the environment’s `deployment_token`.
+
+- **Remember** · Same name? The called job’s environment wins.
+- **Why it works** · The reusable workflow’s deployment job sets `environment: production`. If that environment defines `deployment_token`, that job's `secrets.deployment_token` resolves to the environment value.
+- **Exam trap** · Passing a secret explicitly from the caller can look like an override. The same-named environment secret still takes precedence for the job that references that environment.
+
+[GitHub Docs · Reuse workflows](https://docs.github.com/en/actions/how-tos/reuse-automations/reuse-workflows)
+
+#### Q50 · Reusable workflow or composite action?
+
+| Cue | Reusable workflow | Composite action |
+| --- | --- | --- |
+| What it packages | One or more jobs | Multiple steps |
+| Definition | Workflow YAML with `on: workflow_call` | `action.yml` with `runs.using: composite` |
+| Call site | `jobs.<job_id>.uses` | `steps[*].uses` |
+| Runner | Each called job selects its runner | Uses the enclosing job’s runner |
+
+**Remember** · Workflow goes in a job slot. Composite goes in a step slot. Both use `uses`, so check its indentation.
+
+[GitHub Docs · Reusing workflow configurations](https://docs.github.com/en/actions/concepts/workflows-and-actions/reusing-workflow-configurations)
+
+#### Quick recall
+
+1. Which expression extracts every PR label name before checking membership?
+2. A caller passes `deployment_token` and the called job’s environment has the same secret. Which value does the job use?
+3. You want build and deployment to run as two jobs on different runners. Which reuse mechanism fits, and where does `uses` go?
+
+**Answers** · 1. `contains(github.event.pull_request.labels.*.name, 'preview')` for the `preview` label. 2. The environment’s value. 3. A reusable workflow, invoked through `jobs.<job_id>.uses`.
+
+[Shared study chat](https://chatgpt.com/share/6b07d09f-b8e4-83ec-bffb-191c05991557)
+
+### Practice 2 · 14 missed questions
+
+#### Copilot hooks and approval gates
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q14 · Block a tool call** | Write a JSON object to stdout from `preToolUse`. Set `permissionDecision` to `deny` and include `permissionDecisionReason`. |
+| **Q15 · Repository hook location** | Put repository hook configuration under `.github/hooks/*.json`. Remember **hooks → JSON**, Actions workflows → YAML. |
+| **Q22 · Block a direct shell push in cloud agent** | Use `preToolUse` to evaluate the proposed command before execution. The practice test lists `permissionRequest` as a CLI-only distractor. |
+| **Q57 · Copilot PR checks haven't started** | Look for **Approve and run workflows**. With the default approval policy, a reviewer with write access reviews the changes and starts the workflows. |
+| **Q73 · Empty hook output** | Default behavior continues if no other hook denies the call. Empty output leaves normal permission checks in effect. |
+| **Q80 · Matcher `bash\|powershell`** | The practice answer treats the matcher as a full-match regex on the event-specific value. Read it as exactly `bash` or exactly `powershell`. |
+
+Example denial for Q14 and Q22
+
+```json
+{
+  "permissionDecision": "deny",
+  "permissionDecisionReason": "Open a pull request instead of pushing directly."
+}
+```
+
+**Cloud agent cue** · GitHub documents that `ask` is treated as `deny` on cloud agent because there is no interactive user to answer.
+
+[GitHub Docs · Hooks reference](https://docs.github.com/en/copilot/reference/hooks-reference) · [GitHub Docs · Cloud agent settings](https://docs.github.com/en/copilot/how-tos/use-copilot-agents/cloud-agent/configuring-agent-settings)
+
+#### Copilot CLI and MCP
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q18 · Unattended `copilot -p`** | `--no-ask-user` disables the `ask_user` tool. Tool permissions are configured separately. |
+| **Q37 · MCP server key in JSON** | The quiz expects `mcpServers` for portable Copilot MCP JSON. The editor-managed VS Code `.vscode/mcp.json` format uses `servers`. Check the configuration surface before choosing the key. |
+| **Q65 · `mcp-servers`** | Hyphenated `mcp-servers` belongs to supported custom agent YAML frontmatter. |
+| **Q76 · Default CLI process logs** | On macOS and Linux, look under `~/.copilot/logs/`. Think **CLI process → user home**. |
+| **Q83 · Agent cannot read an external tracker** | Configure the tool or MCP integration and grant the access needed to read the tracker. A prompt can state the task, while the integration provides access. |
+| **Q94 · MCP server entry has `url` and no `command`** | Remote HTTP or SSE, depending on the endpoint and client configuration. A local stdio entry launches a process with `command`. |
+
+[GitHub Docs · CLI flags](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference) · [GitHub Docs · CLI config directories](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-config-dir-reference) · [GitHub Docs · Custom agents](https://docs.github.com/en/copilot/reference/custom-agents-configuration) · [VS Code · MCP configuration](https://code.visualstudio.com/docs/agents/reference/mcp-configuration)
+
+#### PR validation
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q41 · Checkout `github.head_ref`** | It names the PR **source branch**. `github.base_ref` names the **target branch**. |
+| **Q60 · Keep the latest validation for the same PR branch** | Use workflow-level `concurrency` with a stable group such as `${{ github.workflow }}-${{ github.head_ref }}` and `cancel-in-progress: true`. `queue: max` cannot be combined with `cancel-in-progress: true`. For a group scoped to an individual PR, see Practice 3 Q58. |
+
+[GitHub Docs · Actions contexts](https://docs.github.com/en/actions/reference/workflows-and-actions/contexts) · [GitHub Docs · Concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+
+### Practice 3 · Two missed questions
+
+#### Q56 · Where an uploaded artifact lives
+
+**Answer** · GitHub Actions artifact storage associated with the workflow run.
+
+- **Remember** · A runner creates the file. `actions/upload-artifact` uploads it to the workflow run.
+- **Exam trap** · Uploading a report or build output does not create a Git commit. The uploaded copy is available after the job ends, subject to retention.
+- **Where to find it** · Open the workflow run’s summary and look under **Artifacts**.
+
+[GitHub Docs · Workflow artifacts](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflow-artifacts)
+
+#### Q58 · Cancel older validation runs for the same PR
+
+**Answer** · Group by PR number and enable cancellation. Use this at the workflow level for a PR-only validation workflow.
+
+```yaml
+on:
+  pull_request:
+
+concurrency:
+  group: pr-validation-${{ github.event.pull_request.number }}
+  cancel-in-progress: true
+```
+
+| Candidate | What it groups |
+| --- | --- |
+| `github.event.pull_request.number` | All pushes to the same PR. Different PRs get different groups. |
+| `github.run_id` | Each workflow run has its own ID. New runs get separate groups. |
+| `github.run_attempt` | The attempt number starts at 1 for each run. Unrelated first attempts can collide. |
+| `runner.os` | The runner’s OS identifies a platform and is unavailable at workflow-level concurrency. |
+
+**Remember** · Group by what should replace earlier work. Here that’s the **PR**. Q60 gives the branch-based exam answer. Q58 uses the PR number to avoid grouping unrelated PRs with the same source branch name.
+
+[GitHub Docs · Concurrency](https://docs.github.com/en/actions/how-tos/write-workflows/choose-when-workflows-run/control-workflow-concurrency)
+
+#### Quick recall · Practices 2 and 3
+
+1. Which hook and JSON field block a tool call before it executes?
+2. What happens when the hook prints nothing?
+3. What are the MCP server keys for portable JSON, editor-managed VS Code JSON, and custom agent YAML?
+4. Where does an uploaded report live, and what identifies the concurrency group that should cancel stale checks for one PR?
+
+**Answers** · 1. `preToolUse` and `permissionDecision: deny`, with a reason. 2. Normal permission flow continues. 3. `mcpServers`, `servers`, and `mcp-servers`, respectively. 4. In the workflow run’s artifact storage. Use the PR number as the group identifier.
+
+### Practice 4 · Nine missed questions
+
+#### Copilot CLI
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q4 · Export a completed programmatic session to Markdown** | `--share=PATH` writes the transcript locally. Without a custom path, the default is `./copilot-session-<ID>.md`. `--resume` selects a session and `--log-level` changes diagnostic verbosity. |
+| **Q6 · Interactive authentication** | **Quiz answer** · OAuth device flow. **Current GitHub docs** · A local terminal recommends browser sign-in. A remote or headless terminal uses device-code sign-in. Start with `copilot login` or `/login`. |
+| **Q17 · Ignore custom instruction files for one invocation** | `--no-custom-instructions` skips instruction sources such as `AGENTS.md`. Built-in MCP flags control servers. |
+| **Q40 · No questions vs. Autopilot** | `--no-ask-user` disables the questioning tool. Autopilot can continue across model turns. Tool permissions are a separate control. See Practice 2 Q18. |
+
+[GitHub Docs · CLI flags](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference) · [GitHub Docs · CLI authentication](https://docs.github.com/en/copilot/how-tos/copilot-cli/set-up-copilot-cli/authenticate-copilot-cli) · [GitHub Docs · Autopilot](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/use-autopilot-mode)
+
+#### Actions security and validation
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q11 · Binary build provenance** | Set `contents: read`, `id-token: write`, and `attestations: write` under `permissions`. Read source, request an OIDC token, create the attestation. |
+| **Q14 · What `id-token: write` grants** | The job can request a GitHub OIDC token. The cloud provider's trust policy controls token exchange, and the resulting role controls cloud access. |
+| **Q25 · Required CI check in a merge queue** | Include `merge_group` in the CI triggers alongside `pull_request` as appropriate. The queue needs the check on its temporary merge-group commit. |
+| **Q26 · Stop a hung test after 20 minutes** | Set `timeout-minutes: 20` on the test step. Keep the default failure behavior by leaving `continue-on-error` unset. |
+| **Q47 · Pass an untrusted PR title to a shell** | Assign the PR title to a step-level `env` variable. Read that variable in quotes and use a fixed `printf` format. Direct expression interpolation in `run` inserts the value into the script source. |
+
+```yaml
+- name: Print PR title
+  env:
+    PR_TITLE: ${{ github.event.pull_request.title }}
+  run: printf '%s\n' "$PR_TITLE"
+```
+
+[GitHub Docs · Attestations](https://docs.github.com/en/actions/how-tos/secure-your-work/use-artifact-attestations/use-artifact-attestations) · [GitHub Docs · OIDC](https://docs.github.com/en/actions/reference/security/oidc) · [GitHub Docs · Merge queue](https://docs.github.com/en/repositories/configuring-branches-and-merges-in-your-repository/configuring-pull-request-merges/managing-a-merge-queue) · [GitHub Docs · Workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax) · [GitHub Docs · Secure use](https://docs.github.com/en/actions/reference/security/secure-use)
+
+### Practice 5 · 15 missed questions
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q2 · Did the security job fail?** | `${{ needs.security.result == 'failure' }}` checks the named dependency. To let the notification job itself run after a dependency failure, use `${{ failure() && needs.security.result == 'failure' }}`. |
+| **Q10 · Autopilot and session selection** | **Quiz answer** · `copilot --autopilot --resume abc123` is the invalid choice among the original options. Learn the tested pair and check the command reference for the installed CLI when applying it. |
+| **Q22 · Protected production deployment** | Set `environment: production` on the deployment job. The environment supplies its configured protection rules and secrets. |
+| **Q35 · PR has a preview label** | `${{ contains(github.event.pull_request.labels.*.name, 'preview') }}`. See Practice 1 Q35. |
+| **Q36 · 20 matrix jobs, four at once** | Set `strategy.max-parallel: 4`. This caps simultaneous jobs. |
+| **Q40 · Cloud agent MCP capabilities** | Tools only on the tested cloud agent surface. A tool is a callable operation, a resource provides data, and a prompt is a template. |
+| **Q42 · Same secret name in caller and environment** | The called deployment job uses the environment’s value. See Practice 1 Q42. |
+| **Q44 · Manual selection and read-only capabilities** | The quiz uses `infer: false` and a narrow read/search tool list. Current profiles can express manual-only selection with `disable-model-invocation: true` and `user-invocable: true`. |
+| **Q45 · Invalid key with job-level `uses`** | `runs-on`. The called workflow defines its own jobs and runners. |
+| **Q47 · Matrix from discovery JSON** | Set `strategy.matrix` to `${{ fromJSON(needs.discover.outputs.matrix) }}` and declare `needs: discover`. Parse the entire object containing `include`. |
+| **Q48 · Validate PRs targeting main before merge** | Use `pull_request` with `branches: [main]`. The filter matches the PR’s target branch. |
+| **Q49 · `LOG_LEVEL` at three scopes** | The step-level value wins inside that step. Precedence is step → job → workflow. |
+| **Q50 · Reusable workflow vs. composite action** | Reusable workflow → jobs → job-level `uses`. Composite action → steps → step-level `uses`. See Practice 1 Q50. |
+| **Q53 · Allow only the experimental runtime to fail** | Set job-level `continue-on-error: ${{ matrix.experimental }}` with `experimental: true` only for the experimental entry. `fail-fast` controls cancellation of other matrix jobs after a mandatory failure. |
+| **Q54 · Write an `image_tag` step output** | Append `image_tag=value` to `$GITHUB_OUTPUT`. With step ID `meta`, read it as `steps.meta.outputs.image_tag`. |
+
+[GitHub Docs · Expressions](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions) · [GitHub Docs · Workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax) · [GitHub Docs · Custom agents](https://docs.github.com/en/copilot/reference/custom-agents-configuration) · [GitHub Docs · CLI flags](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference)
+
+### Practice 6 · 16 missed questions
+
+#### Triggers, containers, and deployments
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q1 · Release only on tags** | `${{ startsWith(github.ref, 'refs/tags/') }}`. `github.ref` holds the ref path. `github.sha` holds a commit ID. |
+| **Q5 · Chain with `workflow_run`** | Up to three downstream levels after the first workflow. `A → B → C → D` can run. This chain will not trigger `E`. |
+| **Q19 · Run job steps in Docker** | Use `jobs.<id>.container.image: node:22` as the nested configuration path. `services` configures sidecars. |
+| **Q20 · Tell a PR comment from an issue comment** | In an `issue_comment` workflow, check `${{ github.event.issue.pull_request }}`. That property identifies a PR conversation comment. |
+| **Q22 · Composite action `run` step** | Set an explicit `shell` on each `run` step. The caller job supplies the runner. |
+| **Q34 · Prevent administrator bypass in production** | Disable **Allow administrators to bypass configured protection rules** in the environment’s settings. |
+| **Q38 · Preserve a manual input as Boolean** | Use `${{ inputs.perform_deploy }}`. `github.event.inputs` exposes values as strings. |
+| **Q39 · Default shell inside a job container** | `sh`. Specify `shell: bash` when you need Bash features and the image provides Bash. |
+| **Q46 · Staging secrets and variables without deployment record** | Use environment object syntax with `name: staging` and `deployment: false`. |
+
+```yaml
+environment:
+  name: staging
+  deployment: false
+```
+
+[GitHub Docs · Workflow events](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows) · [GitHub Docs · Workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax) · [GitHub Docs · Action metadata](https://docs.github.com/en/actions/reference/workflows-and-actions/metadata-syntax) · [GitHub Docs · Deployment environments](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/deploy-to-environment)
+
+#### Workflow commands
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q21 · File and line error annotation** | `echo "::error file=src/app.js,line=12::Invalid configuration"`. The properties identify the location and the text after the second `::` is the message. |
+| **Q30 · Collapsible log section** | Print `::group::A heading` before the lines and `::endgroup::` after them. |
+| **Q42 · Print untrusted text that contains command markers** | Print `::stop-commands::<random-token>`, print the text, then print `::<random-token>::` to re-enable processing. Use a fresh, unpredictable token for each run. Practice 4 Q47 protects the shell input path. This protects the workflow-command output path. |
+| **Q47 · Mask a runtime-generated secret** | Print `::add-mask::<value>` before the value appears in logs. Masking applies to subsequent output. |
+
+[GitHub Docs · Workflow commands](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-commands)
+
+#### Copilot agents, inventory, and MCP secrets
+
+| Question | Answer and memory cue |
+| --- | --- |
+| **Q13 · Personal and repo agent share a filename** | The repository agent under `.github/agents/` takes precedence over the same-named personal agent in Copilot CLI. |
+| **Q40 · List resources discovered for the working directory** | `copilot plugins list` is the quiz answer for the inventory. Current CLI docs list dedicated commands, including `copilot instruction list` for instruction sources and `copilot lsp list` for language servers. Check the command reference for your installed version. |
+| **Q44 · Cloud agent secret substitution in repository MCP** | Use a name such as `COPILOT_MCP_VENDOR_API_KEY`. The `COPILOT_MCP_` prefix identifies an eligible Agents secret or variable. |
+
+[GitHub Docs · Copilot CLI commands](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference) · [GitHub Docs · Custom agents](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/invoke-custom-agents) · [GitHub Docs · Repository MCP servers](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/copilot-on-github/customize-copilot/configure-mcp-servers)
