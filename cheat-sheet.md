@@ -1,8 +1,8 @@
 # GH-600 Master Cheat Sheet
 
-[Core cheat sheet](#1-agentic-ai-the-core-loop) · [Practice gaps by test](#practice-gaps-by-test)
+[Core cheat sheet](#1-agentic-ai-the-core-loop) · [Practice gaps by test](#practice-gaps-by-test) · [Practice X.1](#practice-x1--22-missed-questions-from-another-exam) · [Practice X.2](#practice-x2--15-missed-questions)
 
-The core reference comes from the [GitHub cheat sheet](https://github.com/spakai/GH-600/blob/main/cheat-sheet.md). The practice review at the end contains 59 entries across six sets, including repeated topics.
+The core reference comes from the [GitHub cheat sheet](https://github.com/spakai/GH-600/blob/main/cheat-sheet.md). The practice review at the end contains 96 entries across eight sets, including repeated topics.
 
 **Exam date: 27 November 2026**
 **Purpose:** fast revision of agentic development concepts and GitHub Copilot workflows.
@@ -649,3 +649,91 @@ environment:
 | **Q44 · Cloud agent secret substitution in repository MCP** | Use a name such as `COPILOT_MCP_VENDOR_API_KEY`. The `COPILOT_MCP_` prefix identifies an eligible Agents secret or variable. |
 
 [GitHub Docs · Copilot CLI commands](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference) · [GitHub Docs · Custom agents](https://docs.github.com/en/copilot/how-tos/copilot-cli/use-copilot-cli/invoke-custom-agents) · [GitHub Docs · Repository MCP servers](https://docs.github.com/en/enterprise-cloud@latest/copilot/how-tos/copilot-on-github/customize-copilot/configure-mcp-servers)
+
+### Practice X.1 · 22 missed questions from another exam
+
+#### Plan approval, scope, and handoffs
+
+| Question | Expected answer and memory cue |
+| --- | --- |
+| **Q6 · What does a PR plan check enforce?** | **Yes / No / Yes.** A PR workflow can check the plan file and the headings it tests. Instructions guide Copilot, and a required status check can block merge. Neither proves the plan was written before the first edit. |
+| **Q7 · Review a plan before implementation** | **3 → 5 → 4 → 2.** Define acceptance criteria, constraints, and allowed files → request a plan-only response → review scope, risks, and tests → record approval or requested changes in the issue. |
+| **Q16 · Why did the reviewer fail the check?** | The implementer contradicted the planner’s handoff. The plan ruled out schema changes, but the diff added a migration. Successful jobs can still produce an outcome that violates the approved scope. |
+| **Q30 · Reconstruct a multi-agent decision** | **2 → 4 → 3 → 1.** Define required decision fields → capture each agent outcome as it completes → write the final coordination summary to `$GITHUB_STEP_SUMMARY` → upload raw handoffs as an artifact. |
+| **Q47 · Select only the tools required for a pilot** | **3 → 1 → 4 → 5.** Inventory repo actions, checks, and external data needs → configure the agent’s tool allowlist → install build and test dependencies in Copilot setup steps → run a pilot issue and inspect the session output. |
+| **Q66 · Turn a vague checkout task into an agent-ready issue** | **4 → 6 → 1 → 3.** Identify affected paths, constraints, and allowed tools → define expected outputs → specify evidence such as checks, tests, and logs → create the GitHub issue. |
+| **Q69 · Resume from approved state** | **Yes / Yes / No.** The saved state SHA matches the current PR head. Exclude previous failed-run artifacts and rejected local notes. Resume with the approved plan, current diff, failed required checks, and runbook. |
+
+#### Release branches, workflow gates, and permissions
+
+| Question | Expected answer and memory cue |
+| --- | --- |
+| **Q22 · Fix only `release/2026.05`** | Select `release/2026.05` as the base branch when assigning the work. It supplies the starting point and PR target. |
+| **Q23 · Release-specific instructions and validation** | **Quiz answer · Yes / Yes / No.** A PR into `release/2026.05` matches `release/**`. The quiz says code review reads instructions from the base branch. Current GitHub docs say it reads them from the **head branch**. The workflow’s branch filter controls triggering and cannot prevent branch creation from `main`. |
+| **Q29 · Manual rollback to a known-good SHA** | **Yes / No / Yes.** `workflow_dispatch` collects the SHA, checkout selects it, and the `staging` environment can require approval. With the shown permissions, `gh issue create` still lacks `issues: write`. Pass the SHA to shell commands via a quoted environment variable. |
+| **Q45 · Release validation check stays pending** | The PR targets `main`, which does not match `release/**`. For `pull_request.branches`, inspect the base branch first. A required check can stay pending when its workflow is skipped by a filter. |
+| **Q49 · Post a PR evaluation comment** | **Quiz fill-ins · `contents: read`, `pull-requests: write`, `issues: read`.** The first permission covers checkout and the second permits a PR timeline comment. GitHub’s comment endpoint accepts either PR-write or issue-write permission. The snippet must also supply `PR_NUMBER` for the command to target a PR. |
+| **Q67 · Dependency review trigger and permissions** | **Quiz fill-ins · `.github/dependabot.yml`, `contents: read`, `pull-requests: read`.** Add the Dependabot path to the manifest and lockfile filters. If this is an always-required check, account for skipped workflows leaving the check pending on unrelated PRs. |
+| **Q70 · Manual protected production release** | **Fill-ins · `workflow_dispatch`, `production`, `./scripts/deploy_checkout.sh`.** The environment controls approval and grants access to its secrets after protection rules pass. The file-presence check only confirms the approval record exists. |
+
+[GitHub Docs · Copilot code review](https://docs.github.com/en/copilot/concepts/agent-capabilities/agent-powered-workflows-and-operations/code-review) · [Workflow syntax](https://docs.github.com/en/actions/reference/workflows-and-actions/workflow-syntax) · [Issue and PR timeline comments](https://docs.github.com/en/rest/issues/comments#create-an-issue-comment) · [Deployment environments](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/deploy-to-environment)
+
+#### MCP registry discovery and enforcement
+
+| Question | Expected answer and memory cue |
+| --- | --- |
+| **Q19 · Registry host, version routes, and local servers** | **Yes / Yes / No.** Configure the registry base URL. The service must expose the server list and version lookups. In the quiz scenario, registry-only enforcement covers local servers too. |
+| **Q26 · Registry gallery returns 404** | The request contains the endpoint path twice. Use the registry base URL in policy so the client can append `/v0.1/servers` once. |
+| **Q43 · Match registry settings to their purpose** | **1-C, 2-B, 3-A, 4-D.** Registry URL → catalog discovery. Registry only → restrict access to listed servers. `GET /v0.1/servers` → list entries. Exact local server ID match → keep that approved local server usable in the quiz scenario. |
+| **Q48 · Keep approved local servers under registry-only policy** | Register each approved local server under its exact ID before enforcing the restriction. |
+
+The three v0.1 routes to remember are `/v0.1/servers`, `/v0.1/servers/{serverName}/versions/latest`, and `/v0.1/servers/{serverName}/versions/{version}`.
+
+[GitHub Docs · Configure an MCP registry](https://docs.github.com/en/copilot/how-tos/administer-copilot/manage-mcp-usage/configure-mcp-registry) · [Restrict access by registry](https://docs.github.com/en/copilot/how-tos/administer-copilot/manage-mcp-usage/restrict-based-on-registry)
+
+#### Copilot Memory and CLI context
+
+| Question | Expected answer and memory cue |
+| --- | --- |
+| **Q31 · Remove an outdated repository fact** | Delete the misleading fact from repository Copilot Memory. The stale migration guidance is stored at repository scope. |
+| **Q32 · Start CLI from the right directory** | Launch Copilot CLI from the trusted repository root so project context starts in the target repo. Avoid starting from the shared parent with unrelated exports, logs, and old copies. |
+| **Q33 · Reset a session stuck on a rejected approach** | Reset the relevant local CLI session context, for example by starting a fresh session without resuming the old one. Repository-level Memory is independent. |
+| **Q56 · Match each memory control to its rule** | **1-B, 2-A, 3-C, 4-D.** Unused entry → quiz says expiry after **28 days**. Misleading repo fact → delete manually. Stale session context → reset locally. Custom instructions → persistent repo files. Current GitHub docs give **90 days by default** without reinforcement, with configurable retention for repository facts. |
+
+[GitHub Docs · Copilot Memory](https://docs.github.com/en/copilot/concepts/prompting-and-context/copilot-memory) · [Copilot CLI command reference](https://docs.github.com/en/copilot/reference/copilot-cli-reference/cli-command-reference)
+
+### Practice X.2 · 15 missed questions
+
+#### Approval gates and review
+
+| Question | Expected answer and memory cue |
+| --- | --- |
+| **Q3 · Match escalation signals to responses** | **1-A, 2-B, 3-C, 4-D.** Failed required check → review before marking ready. Denied shell command → use the approval path with the blocked command and its context. Missing MCP tools → inspect server startup and setup. Out-of-scope edits → narrow the issue and request review. |
+| **Q8 · Manual run started but the agent did not** | The approval gate blocked the agent-start job because the linked issue lacked the required `agent-approved` label. Inspect the gate result before investigating the agent itself. |
+| **Q9 · Protected agent-execution environment** | **Yes / No / Yes.** Required environment reviewers can hold the job before protected steps run and provide a human execution gate. A manual trigger records that someone started the workflow. Plan approval requires its own evidence. |
+| **Q29 · Migration PR fails a credential-sensitive test** | Keep the PR in draft and request owner review. This preserves the work and gives the responsible owner a chance to evaluate the test failure and credential request before advancing the PR. |
+| **Q38 · Payments refactor also changes workflow YAML** | Review the draft diff and require owner approval before merging. Passing unit tests and an approved issue cover different decisions from approving a workflow change. |
+| **Q55 · Find the first broken handoff** | Implementation touched the payment gateway outside the checkout retry scope. The payment test failure came next, and release review skipped because validation failed. Read the approved scope, changed paths, and job outcomes in that order. |
+
+#### Agent profiles, MCP access, and CLI scope
+
+| Question | Expected answer and memory cue |
+| --- | --- |
+| **Q10 · Cloud custom agent with manual selection** | **Fill-ins · `github-copilot`, `tools`, `disable-model-invocation`.** Set `target: github-copilot`, list `["read", "search", "edit", "github/*"]` under `tools`, and set `disable-model-invocation: true`. Keep user invocation enabled. The pasted quiz duplicates choices B and C with the same values. |
+| **Q12 · Match tool allowlist patterns** | **1-A, 2-B, 3-C, 4-D.** Omitted `tools` → all available configured tools. `tools: []` → zero tools. Explicit aliases → listed tools only. `github/*` → the GitHub MCP namespace. |
+| **Q17 · Dirty worktree before local agent changes** | Cleanly isolate existing unrelated edits before execution, for example with a separate worktree. Check the diff before staging so the PR contains only the intended task. |
+| **Q37 · MCP server configured with an empty tool list** | **Yes / No / Yes.** An empty list disables tools. Declaring the server does not grant its tools to the agent. Add the specific server tools that the task needs to the allowlist. |
+| **Q40 · Enterprise registry-only policy** | **Yes / Yes / No.** On supported surfaces, registry-only restricts use to approved entries. The quiz applies exact ID matching to local servers. The quiz’s third statement is false because ID matching offers limited protection against edited local configuration. See Practice X.1 Q19, Q43, and Q48. |
+| **Q48 · CLI launched from the home directory** | The CLI started with an overly broad working scope. Launch from the trusted target repository root so unrelated home-directory data stays outside the intended task. |
+
+[GitHub Docs · Custom agent configuration](https://docs.github.com/en/copilot/reference/custom-agents-configuration) · [Registry restrictions](https://docs.github.com/en/copilot/how-tos/administer-copilot/manage-mcp-usage/restrict-based-on-registry)
+
+#### Durable evidence and workflow comments
+
+| Question | Expected answer and memory cue |
+| --- | --- |
+| **Q43 · Preserve diagnostics when tests fail** | **Fill-ins · `pull_request`, `always()`, `actions/upload-artifact@v4`.** Run validation for PRs into `main` and upload whatever diagnostics exist even after a failed step. In the quiz snippet, the plan copy follows the test command inside the same script. Move the copy before the test, or into its own failure-tolerant step, so a failed test cannot skip it. |
+| **Q54 · Prevent context drift across issue, PR, and CI** | **2 → 3 → 4 → 6.** Put scope and acceptance criteria in the issue → record decisions in the draft PR → upload validation evidence → review the durable records before marking ready. |
+| **Q62 · Comment only on guardrail failure** | **Fill-ins · `pull_request`, `pull-requests`, `run`.** Use `contents: read` and `pull-requests: write` with `gh pr comment`. The quiz uses `if: failure()`, which also catches other earlier step failures. For a comment tied to the guardrail specifically, give that step `id: guardrail` and use `if: failure() && steps.guardrail.outcome == 'failure'`. If the script can fail for reasons other than a violation, have it report a separate violation signal. |
+
+[GitHub Docs · Expressions and status checks](https://docs.github.com/en/actions/reference/workflows-and-actions/expressions) · [Workflow artifacts](https://docs.github.com/en/actions/concepts/workflows-and-actions/workflow-artifacts)
