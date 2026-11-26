@@ -185,6 +185,14 @@ copilot --allow-tool='shell(git:*)' --deny-tool='shell(git push)'
 
 Allow/deny controls illustrate tool restrictions; they are not a complete sandbox or a substitute for credential scoping.
 
+For an unattended prompt run in CI, add `--no-ask-user` so the agent does not pause to request more user input:
+
+```bash
+copilot -p "Run the requested checks" --no-ask-user
+```
+
+This prevents follow-up questions; it does not grant tool permissions or replace explicit permission configuration.
+
 ### GitHub Actions: validation and security
 
 ```yaml
@@ -210,6 +218,37 @@ jobs:
 
 The snippet assumes the runner has a suitable Node version; configure the project's required version in a real workflow. `pull-requests: read` is for reading PR metadata; checkout and local tests generally need only `contents: read`.
 
+**`GITHUB_OUTPUT` vs. `GITHUB_ENV`:**
+
+| File | Purpose | How a later step reads it |
+|---|---|---|
+| `GITHUB_OUTPUT` | Set a named output on the current step | `steps.<step-id>.outputs.<name>` |
+| `GITHUB_ENV` | Add an environment variable for subsequent steps in the same job | `$NAME` or `${{ env.NAME }}` |
+
+Writes to either file do not change the current step. Use outputs for explicit step dependencies and environment files for ambient job configuration. To share data across jobs, expose a job output or use another supported mechanism; `GITHUB_ENV` variables do not cross job boundaries automatically.
+
+```yaml
+- id: build
+  run: echo "artifact=app.zip" >> "$GITHUB_OUTPUT"
+- run: echo "${{ steps.build.outputs.artifact }}"
+
+- run: echo "BUILD_DIR=dist" >> "$GITHUB_ENV"
+- run: echo "$BUILD_DIR"
+```
+
+To gate production deployment by humans, use a protected **GitHub Actions environment** with required reviewers:
+
+```yaml
+jobs:
+  deploy-production:
+    environment:
+      name: production
+    steps:
+      # deployment steps
+```
+
+Configure the `production` environment's protection rules to require designated reviewers. The deployment job pauses until an authorized reviewer approves it, providing an enforced and auditable gate. A workflow `if:` condition or comment is not a substitute for an environment approval gate.
+
 | Syntax / clue | Meaning |
 |---|---|
 | `uses:` | Invoke an action |
@@ -218,20 +257,38 @@ The snippet assumes the runner has a suitable Node version; configure the projec
 | `opened` / `synchronize` | PR created / PR head updated |
 | `ready_for_review` | Draft PR marked ready |
 | `workflow_dispatch` | Explicit workflow dispatch |
+| `repository_dispatch` | External API-triggered custom event |
 | `workflow_run` | React to another workflow run |
 | `workflow_call` | Reusable workflow called by another workflow |
+
+**Git hooks vs. GitHub Actions triggers:** Git hooks are local scripts run by Git during operations such as `commit` or `push` (for example, `pre-commit`); they are usually stored in `.git/hooks/` and are not shared by committing the repository. GitHub Actions triggers are workflow `on:` events such as `push` or `pull_request`; they run jobs on a GitHub-hosted or configured self-hosted runner and are defined in versioned workflow files. Local hooks help with immediate developer feedback, while Actions provide shared CI; do not rely on client-side hooks alone to enforce policy.
 
 **`workflow_*` use cases:**
 
 | Trigger | Example use cases | Key distinction |
 |---|---|---|
 | `workflow_dispatch` | Manually test Copilot setup steps; start an on-demand deployment with chosen inputs | Started by a user or API; the workflow file must exist on the default branch. Copilot runs its setup separately when an agent session starts. |
+| `repository_dispatch` | Start a workflow from an external system with custom event data | Read caller-supplied JSON fields from `github.event.client_payload.<field>`; the request also supplies an `event_type` matched by `types:`. Validate payload values before using them in privileged actions. |
 | `workflow_call` | Share a standard build-and-test workflow across repositories; reuse a common security scan in multiple pipelines | The caller invokes the reusable workflow at the job level with `uses:`; inputs and secrets can be passed explicitly. |
 | `workflow_run` | Create an issue after validation fails; deploy after a build succeeds | Reacts to another workflow's run; `completed` includes failures, so check the upstream conclusion before a success-only or failure-only action. |
 
+**Matrix strategy:** `strategy.matrix` creates a separate job for each combination of declared values, such as each operating system and runtime version. Use `include` and `exclude` to add or remove specific combinations.
+
+**Matrix fan-out limit:** GitHub Actions allows at most 256 matrix-generated jobs per workflow run. A matrix with 300 agent entries exceeds that limit; batch the work across workflow runs and account for runner capacity and cost. `max-parallel` limits simultaneous jobs but does not raise the total limit.
+
+**Concurrency with `cancel-in-progress: true`:** runs sharing the same `concurrency.group` are limited to one running and one pending run. A newly queued run replaces an older pending run; with `cancel-in-progress: true`, it also cancels the currently running run in that group. This helps avoid spending CI time on stale commits, but is unsuitable for work that should not be interrupted, such as deployments or other non-idempotent operations.
+
+Include `github.workflow` in a concurrency group to namespace it per workflow: groups are repository-wide, so omitting it can make different workflows on the same PR branch cancel or replace each other's runs. `github.head_ref || github.run_id` groups PR runs by source branch and gives non-PR events a unique fallback.
+
+**`github.event.client_payload`** is for custom data sent with a `repository_dispatch` event, for example `${{ github.event.client_payload.environment }}`. It is not the input mechanism for `workflow_dispatch`; use the `inputs` context for manually supplied workflow inputs.
+
 Prefer `pull_request` when testing PR code. Do not execute untrusted PR code in a privileged `pull_request_target` context with secrets or write access. Read permissions limit token authority, but running PR code still executes untrusted code. Agent approval gates and repository Actions policies may also affect when CI runs.
 
+**`github.ref`:** on a push to `main`, it is `refs/heads/main` (branch refs use `refs/heads/<branch>`). On `pull_request`, it is commonly `refs/pull/<number>/merge`, the PR's synthetic merge ref—not the source branch name. Use `github.head_ref` for the PR source branch and `github.base_ref` for the target branch. `pull_request_target` has different ref behavior: it uses the base branch ref.
+
 To retain failure evidence, an upload step can use `if: always()`; this allows the step to run after earlier failures but does not create missing evidence. Sanitize files before uploading and set a suitable retention period.
+
+For a required review artifact, set `if-no-files-found: error` on `actions/upload-artifact`; the upload step fails if no files match, rather than only warning.
 
 ### Workflow completion and failure escalation
 
@@ -284,7 +341,7 @@ When permissions are explicitly listed, unspecified permissions become `none`. O
 
 **Don't confuse:** `actions: write` manages Actions operations; it does not grant issue creation. `failure()` checks the current execution context; use `github.event.workflow_run.conclusion` for the upstream run. A merged PR is a `closed` event plus a merged-state check—there is no `merged` activity type for `pull_request`.
 
-### Copilot CLI hooks
+### Copilot CLI and cloud-agent hooks
 
 | Hook | When it runs | Typical use |
 |---|---|---|
@@ -294,11 +351,22 @@ When permissions are explicitly listed, unspecified permissions become `none`. O
 | `postToolUse` | After a tool executes | Record results; cannot prevent the completed action |
 | `sessionEnd` | Session ends | Cleanup or session audit summary |
 
-**Recall:** start → guide; prompt → log; pre → prevent; post → record. Native repository hook configuration is stored in JSON files under `.github/hooks/`; ensure the scripts exist and paths resolve from the configured working directory.
+**Recall:** start → guide; prompt → log; pre → prevent; post → record. Store repository-level hook configuration as JSON files in `.github/hooks/*.json` at the repository root. Copilot CLI and cloud agent load hooks from this location; cloud agent supports only a subset of events, so verify event and command compatibility. Ensure scripts exist and paths resolve from the configured working directory.
 
-**Do not confuse Copilot CLI hooks with Git hooks:** `.github/hooks/*.json` contains GitHub Copilot CLI hook configuration. Standard Git hooks are local executable scripts stored in `.git/hooks/` (or the directory set by Git's `core.hooksPath`), not JSON configuration files. The `.github/hooks/` location is therefore product-specific, whereas Git's built-in hook mechanism is repository-local and script-based.
+**Do not confuse Copilot hooks with Git hooks:** `.github/hooks/*.json` contains Copilot repository-hook configuration. Standard Git hooks are local executable scripts stored in `.git/hooks/` (or the directory set by Git's `core.hooksPath`), not JSON configuration files. The `.github/hooks/` location is therefore product-specific, whereas Git's built-in hook mechanism is repository-local and script-based.
 
-Use `preToolUse` for cross-surface allow/deny decisions before a tool executes. `permissionRequest` is CLI-only and should not be treated as an available hook on every Copilot surface. For a `preToolUse` handler, the script's logic determines which calls it denies. Exiting successfully without a decision leaves normal permission checks in effect; it does not grant unrestricted access. An escalation message does not create an issue unless a separate authorized action does so. Regex command filters are not a complete security boundary; apply scoped credentials and execution controls too. Log prompts only with appropriate access, retention, and secret redaction.
+**Why a PowerShell-only repository hook may not protect a Copilot cloud agent:** a raw command is not a registered hook; the `.github/hooks/*.json` configuration must declare a supported event and handler. The cloud agent runs in Linux and honors the `bash` field (or the `command` fallback), not the `powershell` field. Git hooks under `.git/hooks/` are local and are not automatically carried into cloud-agent runs. Validate the hook configuration and runtime in the agent environment, and do not rely on an unverified hook as an enforcement boundary.
+
+For cloud-agent tool control, use a repository-level `preToolUse` hook to inspect shell-tool arguments and deny prohibited commands before execution. `permissionRequest` is ineffective in the cloud agent because its tool calls are pre-approved. To block a tool, write one JSON object to stdout:
+
+```json
+{
+  "permissionDecision": "deny",
+  "permissionDecisionReason": "Blocked by policy: this operation is not allowed."
+}
+```
+
+The reason is required with `deny`. In the cloud agent, `ask` is treated as `deny` because no user is available to answer. Exiting successfully without a decision leaves normal permission checks in effect; it does not grant unrestricted access. An escalation message does not create an issue unless a separate authorized action does so. Regex command filters are not a complete security boundary; apply scoped credentials and execution controls too. Log prompts only with appropriate access, retention, and secret redaction.
 
 In an audit-style record, `operation_type` identifies **what kind of action occurred**—for example, `read`, `write`, `execute`, `delete`, `login`, or `permission_request`. It supports filtering, policy checks, reporting, and correlation without replacing details such as the actor, target resource, timestamp, or outcome. Keep values consistent and bounded to a documented taxonomy so audit consumers can classify events reliably.
 
